@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: gousc
+      POSTGRES_USER: gousc
+      POSTGRES_PASSWORD: gousc
+    ports:
+      - "5432:5432"
+    volumes:
+      - gousc-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gousc -d gousc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  gousc-pgdata:
