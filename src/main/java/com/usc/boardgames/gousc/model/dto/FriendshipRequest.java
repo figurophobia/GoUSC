@@ -1,4 +1,6 @@
 package com.usc.boardgames.gousc.model.dto;
 
-public record FriendshipRequest(Long addresseeId) {
+import jakarta.validation.constraints.NotNull;
+
+public record FriendshipRequest(@NotNull Long addresseeId) {
 }

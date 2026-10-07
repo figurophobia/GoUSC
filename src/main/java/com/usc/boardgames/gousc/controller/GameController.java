@@ -40,7 +40,7 @@ public class GameController {
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Game> create(@RequestHeader("X-User-Id") Long userId,
-                                       @RequestBody NewGame request)
+                                       @jakarta.validation.Valid @RequestBody NewGame request)
             throws UserNotFoundException {
         Game created = games.create(users.get(userId), request.boardSize(), request.mode());
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -88,7 +88,7 @@ public class GameController {
     @PostMapping(path = "{id}/moves", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Game> move(@PathVariable Long id,
                                      @RequestHeader("X-User-Id") Long userId,
-                                     @RequestBody Move move)
+                                     @jakarta.validation.Valid @RequestBody Move move)
             throws GameNotFoundException, GameStateException, InvalidMoveException, UserNotFoundException {
         return ResponseEntity.ok(games.playMove(id, users.get(userId), move));
     }
@@ -102,7 +102,7 @@ public class GameController {
     @PostMapping(path = "{id}/messages", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Message> sendMessage(@PathVariable Long id,
                                                @RequestHeader("X-User-Id") Long userId,
-                                               @RequestBody NewMessage body)
+                                               @jakarta.validation.Valid @RequestBody NewMessage body)
             throws GameNotFoundException, GameStateException, UserNotFoundException {
         return ResponseEntity.ok(messages.sendGame(id, users.get(userId), body.content()));
     }

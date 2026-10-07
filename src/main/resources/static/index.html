@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoUSC - Go Online</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="loginSection" class="section">
+            <h1>GoUSC</h1>
+            <div class="tabs">
+                <button class="tab active" data-tab="loginTab">Iniciar sesión</button>
+                <button class="tab" data-tab="registerTab">Registrarse</button>
+            </div>
+            <div id="loginTab" class="tabContent active">
+                <form id="loginForm" novalidate>
+                    <input type="text" id="loginUsername" placeholder="Usuario" required>
+                    <input type="password" id="loginPassword" placeholder="Contraseña" required>
+                    <button type="submit">Entrar</button>
+                    <div id="loginError" class="error"></div>
+                </form>
+            </div>
+            <div id="registerTab" class="tabContent">
+                <form id="registerForm" novalidate>
+                    <input type="text" id="regUsername" placeholder="Usuario (min 3)" required>
+                    <input type="password" id="regPassword" placeholder="Contraseña (min 3)" required>
+                    <input type="email" id="regEmail" placeholder="Email">
+                    <button type="submit">Crear cuenta</button>
+                    <div id="regError" class="error"></div>
+                </form>
+            </div>
+        </div>
+
+        <div id="mainSection" class="section" style="display:none">
+            <header class="header">
+                <h2>GoUSC</h2>
+                <div class="userInfo">
+                    <span id="currentUser"></span>
+                    <span>ELO: <span id="currentElo"></span></span>
+                    <button id="logoutBtn">Salir</button>
+                </div>
+            </header>
+            <nav class="nav">
+                <button class="navBtn active" data-view="lobbyView">Lobby</button>
+                <button class="navBtn" data-view="rankingView">Ranking</button>
+                <button class="navBtn" data-view="friendsView">Amigos</button>
+                <button class="navBtn" data-view="chatView">Chat</button>
+            </nav>
+            <main class="main">
+                <div id="lobbyView" class="view active">
+                    <div class="lobbyActions">
+                        <select id="boardSizeSelect">
+                            <option value="NINE">9x9</option>
+                            <option value="THIRTEEN">13x13</option>
+                            <option value="NINETEEN">19x19</option>
+                        </select>
+                        <select id="gameModeSelect">
+                            <option value="CASUAL">Casual</option>
+                            <option value="RANKED">Ranked</option>
+                        </select>
+                        <button id="createGameBtn">Crear partida</button>
+                        <button id="refreshLobbyBtn">Actualizar</button>
+                    </div>
+                    <div class="gamesList" id="gamesList"></div>
+                </div>
+                <div id="rankingView" class="view">
+                    <h3>Ranking</h3>
+                    <table class="table">
+                        <thead><tr><th>#</th><th>Usuario</th><th>ELO</th><th>W</th><th>L</th></tr></thead>
+                        <tbody id="rankingBody"></tbody>
+                    </table>
+                </div>
+                <div id="friendsView" class="view">
+                    <h3>Amigos</h3>
+                    <div class="friendActions">
+                        <input type="text" id="friendIdInput" placeholder="ID usuario">
+                        <button id="addFriendBtn">Enviar solicitud</button>
+                    </div>
+                    <h4>Solicitudes pendientes</h4>
+                    <div id="pendingList"></div>
+                    <h4>Mis amigos</h4>
+                    <div id="friendsList"></div>
+                </div>
+                <div id="chatView" class="view">
+                    <h3>Chat privado</h3>
+                    <div class="chatSelect">
+                        <select id="chatUserSelect"></select>
+                        <button id="loadChatBtn">Cargar</button>
+                    </div>
+                    <div id="privateChat" class="chatBox"></div>
+                    <div class="chatInput">
+                        <input type="text" id="privateMsgInput" placeholder="Mensaje">
+                        <button id="sendPrivateBtn">Enviar</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <div id="gameSection" class="section" style="display:none">
+            <header class="header">
+                <h2>Partida #<span id="gameIdSpan"></span></h2>
+                <div class="gameInfo">
+                    <span id="gameStatus"></span> | <span id="gameTurn"></span>
+                    <button id="backToLobbyBtn">Volver al lobby</button>
+                </div>
+            </header>
+            <div class="gameLayout">
+                <div class="boardContainer">
+                    <canvas id="goBoard" width="600" height="600"></canvas>
+                </div>
+                <div class="gameSidebar">
+                    <div class="players">
+                        <div id="blackPlayer">Negras: -</div>
+                        <div id="whitePlayer">Blancas: -</div>
+                    </div>
+                    <div class="gameActions">
+                        <button id="passBtn">Pasar</button>
+                        <button id="leaveBtn">Abandonar</button>
+                    </div>
+                    <div class="gameChat">
+                        <h4>Chat partida</h4>
+                        <div id="gameChatBox" class="chatBox"></div>
+                        <div class="chatInput">
+                            <input type="text" id="gameMsgInput" placeholder="Mensaje">
+                            <button id="sendGameMsgBtn">Enviar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/app.js"></script>
+</body>
+</html>

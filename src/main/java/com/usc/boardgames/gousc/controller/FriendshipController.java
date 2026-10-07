@@ -33,7 +33,7 @@ public class FriendshipController {
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Friendship> request(@RequestHeader("X-User-Id") Long userId,
-                                               @RequestBody FriendshipRequest body)
+                                               @jakarta.validation.Valid @RequestBody FriendshipRequest body)
             throws UserNotFoundException, DuplicateFriendshipException {
         Friendship created = friendships.request(users.get(userId), body.addresseeId());
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()

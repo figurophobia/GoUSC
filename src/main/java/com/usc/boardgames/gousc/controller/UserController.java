@@ -33,7 +33,7 @@ public class UserController {
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @JsonView(Views.Public.class)
-    public ResponseEntity<User> create(@RequestBody User user) throws DuplicateUserException {
+    public ResponseEntity<User> create(@jakarta.validation.Valid @RequestBody User user) throws DuplicateUserException {
         User created = users.create(user);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}").buildAndExpand(created.id()).toUri();
@@ -42,7 +42,7 @@ public class UserController {
 
     @PostMapping(path = "login", produces = MediaType.APPLICATION_JSON_VALUE)
     @JsonView(Views.Public.class)
-    public ResponseEntity<User> login(@RequestBody Credentials credentials)
+    public ResponseEntity<User> login(@jakarta.validation.Valid @RequestBody Credentials credentials)
             throws UserNotFoundException, InvalidCredentialsException {
         return ResponseEntity.ok(users.login(credentials));
     }

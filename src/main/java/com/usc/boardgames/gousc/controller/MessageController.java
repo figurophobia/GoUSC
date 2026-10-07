@@ -28,7 +28,7 @@ public class MessageController {
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Message> send(@RequestHeader("X-User-Id") Long userId,
                                         @RequestParam("to") Long to,
-                                        @RequestBody NewMessage body)
+                                        @jakarta.validation.Valid @RequestBody NewMessage body)
             throws UserNotFoundException {
         return ResponseEntity.ok(messages.sendPrivate(users.get(userId), to, body.content()));
     }

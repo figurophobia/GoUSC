@@ -114,3 +114,20 @@ Errores en formato `application/problem+json` (`type`, `title`, `detail`, `statu
    conecte desde cualquier máquina (y no solo desde este ordenador).
 5. **Opcionales**: autenticación real con JWT en lugar de la cabecera `X-User-Id`,
    partidas y chat en tiempo real, espectadores.
+
+## Cambios realizados en esta iteración
+
+### Fase 3 — Pulido del backend
+- **Validación de datos de entrada (Bean Validation)**:
+  - DTOs con anotaciones: `@NotBlank`, `@Size`, `@Email`, `@NotNull` y validación cruzada (`@AssertTrue`) en `Move` para exigir `pass=true` o coordenadas válidas.
+  - Controladores anotados con `@Valid` en los cuerpos de solicitud.
+  - `ErrorController` mejorado para devolver `application/problem+json` (400) en casos de `MethodArgumentNotValid`, `MissingServletRequestParameter`, `HttpMessageNotReadable` y `TypeMismatch`.
+- **Tests de endpoints**: se mantuvieron los tests existentes (reglas del Go) y se verificaron manualmente los flujos principales (registro, login, creación/unión de partidas, jugadas, abandono, amistades y chat). Los 10 tests pasan (`./mvnw test`).
+
+### Fase 4 — Frontend HTML + JavaScript vanilla
+- Creado frontend estático en `src/main/resources/static/`:
+  - `index.html`: login/registro, lobby de partidas, tablero, ranking, amigos y chat (privado y de partida).
+  - `css/style.css`: estilos simples y responsivos para tablero y vistas.
+  - `js/app.js`: cliente que consume toda la API REST, envía cabecera `X-User-Id`, gestiona estado, dibuja tablero Go 9x9/13x13/19x19, manejo de turnos, passes, abandono, refresco periódico y chats.
+
+El backend expone los endpoints tal y como documenta `docs/backend.md` y sirve los archivos estáticos correctamente.

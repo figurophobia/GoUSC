@@ -13,6 +13,7 @@ import com.usc.boardgames.gousc.exception.UserNotFoundException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -139,6 +140,62 @@ public class ErrorController extends ResponseEntityExceptionHandler {
         error.setType(uri("bad-request"));
         error.setTitle("Petición inválida");
         return ErrorResponse.builder(ex, error).build();
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(
+            org.springframework.web.bind.MethodArgumentNotValidException ex,
+            org.springframework.http.HttpHeaders headers,
+            org.springframework.http.HttpStatusCode status,
+            org.springframework.web.context.request.WebRequest request) {
+        ProblemDetail error = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        String detail = ex.getBindingResult().getFieldErrors().stream()
+                .map(e -> e.getField() + ": " + (e.getDefaultMessage() != null ? e.getDefaultMessage() : "campo inválido"))
+                .findFirst()
+                .orElse("Datos de entrada inválidos");
+        error.setDetail(detail);
+        error.setType(uri("bad-request"));
+        error.setTitle("Petición inválida");
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(
+            org.springframework.web.bind.MissingServletRequestParameterException ex,
+            org.springframework.http.HttpHeaders headers,
+            org.springframework.http.HttpStatusCode status,
+            org.springframework.web.context.request.WebRequest request) {
+        ProblemDetail error = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        error.setDetail("Falta el parámetro obligatorio: " + ex.getParameterName());
+        error.setType(uri("bad-request"));
+        error.setTitle("Petición inválida");
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            org.springframework.http.converter.HttpMessageNotReadableException ex,
+            org.springframework.http.HttpHeaders headers,
+            org.springframework.http.HttpStatusCode status,
+            org.springframework.web.context.request.WebRequest request) {
+        ProblemDetail error = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        error.setDetail("Cuerpo de la petición inválido o mal formado");
+        error.setType(uri("bad-request"));
+        error.setTitle("Petición inválida");
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(
+            org.springframework.beans.TypeMismatchException ex,
+            org.springframework.http.HttpHeaders headers,
+            org.springframework.http.HttpStatusCode status,
+            org.springframework.web.context.request.WebRequest request) {
+        ProblemDetail error = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        error.setDetail("Valor inválido para el parámetro: " + ex.getPropertyName());
+        error.setType(uri("bad-request"));
+        error.setTitle("Petición inválida");
+        return ResponseEntity.badRequest().body(error);
     }
 
     private static URI uri(String slug) {
