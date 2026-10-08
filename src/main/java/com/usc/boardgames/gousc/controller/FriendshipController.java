@@ -4,9 +4,11 @@ import com.usc.boardgames.gousc.exception.DuplicateFriendshipException;
 import com.usc.boardgames.gousc.exception.FriendshipNotFoundException;
 import com.usc.boardgames.gousc.exception.FriendshipStateException;
 import com.usc.boardgames.gousc.exception.UserNotFoundException;
+import com.fasterxml.jackson.annotation.JsonView;
 import com.usc.boardgames.gousc.model.dto.Friendship;
 import com.usc.boardgames.gousc.model.dto.FriendshipRequest;
 import com.usc.boardgames.gousc.model.dto.User;
+import com.usc.boardgames.gousc.model.dto.Views;
 import com.usc.boardgames.gousc.service.FriendshipService;
 import com.usc.boardgames.gousc.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +34,7 @@ public class FriendshipController {
     }
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<Friendship> request(@RequestHeader("X-User-Id") Long userId,
                                                @jakarta.validation.Valid @RequestBody FriendshipRequest body)
             throws UserNotFoundException, DuplicateFriendshipException {
@@ -42,6 +45,7 @@ public class FriendshipController {
     }
 
     @PostMapping(path = "{id}/accept", produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<Friendship> accept(@PathVariable Long id,
                                              @RequestHeader("X-User-Id") Long userId)
             throws FriendshipNotFoundException, FriendshipStateException, UserNotFoundException {
@@ -49,6 +53,7 @@ public class FriendshipController {
     }
 
     @PostMapping(path = "{id}/reject", produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<Friendship> reject(@PathVariable Long id,
                                              @RequestHeader("X-User-Id") Long userId)
             throws FriendshipNotFoundException, FriendshipStateException, UserNotFoundException {
@@ -56,12 +61,14 @@ public class FriendshipController {
     }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<List<User>> friends(@RequestHeader("X-User-Id") Long userId)
             throws UserNotFoundException {
         return ResponseEntity.ok(friendships.listFriends(users.get(userId)));
     }
 
     @GetMapping(path = "pending", produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<List<Friendship>> pending(@RequestHeader("X-User-Id") Long userId)
             throws UserNotFoundException {
         return ResponseEntity.ok(friendships.listPending(users.get(userId)));

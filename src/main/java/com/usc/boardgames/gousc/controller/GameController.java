@@ -5,10 +5,12 @@ import com.usc.boardgames.gousc.exception.GameNotFoundException;
 import com.usc.boardgames.gousc.exception.GameStateException;
 import com.usc.boardgames.gousc.exception.InvalidMoveException;
 import com.usc.boardgames.gousc.exception.UserNotFoundException;
+import com.fasterxml.jackson.annotation.JsonView;
 import com.usc.boardgames.gousc.model.dto.Game;
 import com.usc.boardgames.gousc.model.dto.Message;
 import com.usc.boardgames.gousc.model.dto.Move;
 import com.usc.boardgames.gousc.model.dto.NewGame;
+import com.usc.boardgames.gousc.model.dto.Views;
 import com.usc.boardgames.gousc.model.dto.NewMessage;
 import com.usc.boardgames.gousc.model.entity.GameStatus;
 import com.usc.boardgames.gousc.service.GameService;
@@ -39,6 +41,7 @@ public class GameController {
     }
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<Game> create(@RequestHeader("X-User-Id") Long userId,
                                        @jakarta.validation.Valid @RequestBody NewGame request)
             throws UserNotFoundException {
@@ -49,6 +52,7 @@ public class GameController {
     }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<List<Game>> get(
             @RequestParam(value = "status", required = false) GameStatus status,
             @RequestParam(value = "player", required = false) Long playerId
@@ -67,11 +71,13 @@ public class GameController {
     }
 
     @GetMapping(path = "{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<Game> get(@PathVariable Long id) throws GameNotFoundException {
         return ResponseEntity.ok(games.get(id));
     }
 
     @PostMapping(path = "{id}/join", produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<Game> join(@PathVariable Long id,
                                      @RequestHeader("X-User-Id") Long userId)
             throws GameNotFoundException, GameFullException, GameStateException, UserNotFoundException {
@@ -79,6 +85,7 @@ public class GameController {
     }
 
     @PostMapping(path = "{id}/leave", produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<Game> leave(@PathVariable Long id,
                                       @RequestHeader("X-User-Id") Long userId)
             throws GameNotFoundException, GameStateException, UserNotFoundException {
@@ -86,6 +93,7 @@ public class GameController {
     }
 
     @PostMapping(path = "{id}/moves", produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<Game> move(@PathVariable Long id,
                                      @RequestHeader("X-User-Id") Long userId,
                                      @jakarta.validation.Valid @RequestBody Move move)
@@ -94,12 +102,14 @@ public class GameController {
     }
 
     @GetMapping(path = "{id}/messages", produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<List<Message>> getMessages(@PathVariable Long id)
             throws GameNotFoundException {
         return ResponseEntity.ok(messages.listGame(id));
     }
 
     @PostMapping(path = "{id}/messages", produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<Message> sendMessage(@PathVariable Long id,
                                                @RequestHeader("X-User-Id") Long userId,
                                                @jakarta.validation.Valid @RequestBody NewMessage body)

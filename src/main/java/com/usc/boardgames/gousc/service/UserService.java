@@ -56,9 +56,22 @@ public class UserService {
         return userRepository.findAll(page).map(User::from);
     }
 
-    public User update(Long id, User changes) throws UserNotFoundException {
+    public User update(Long id, User changes) throws UserNotFoundException, DuplicateUserException {
         var user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(String.valueOf(id)));
+        if (changes.username() != null && !changes.username().isBlank()) {
+            String username = changes.username().trim();
+            if (username.length() < 3 || username.length() > 50) {
+                throw new IllegalArgumentException("El nombre de usuario debe tener entre 3 y 50 caracteres");
+            }
+            if (!username.equals(user.getUsername())) {
+                var existing = userRepository.findByUsername(username);
+                if (existing.isPresent() && !existing.get().getId().equals(id)) {
+                    throw new DuplicateUserException(existing.get());
+                }
+                user.setUsername(username);
+            }
+        }
         if (changes.email() != null) {
             user.setEmail(changes.email());
         }

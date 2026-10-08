@@ -1,8 +1,10 @@
 package com.usc.boardgames.gousc.controller;
 
 import com.usc.boardgames.gousc.exception.UserNotFoundException;
+import com.fasterxml.jackson.annotation.JsonView;
 import com.usc.boardgames.gousc.model.dto.Message;
 import com.usc.boardgames.gousc.model.dto.NewMessage;
+import com.usc.boardgames.gousc.model.dto.Views;
 import com.usc.boardgames.gousc.service.MessageService;
 import com.usc.boardgames.gousc.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,7 @@ public class MessageController {
     }
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<Message> send(@RequestHeader("X-User-Id") Long userId,
                                         @RequestParam("to") Long to,
                                         @jakarta.validation.Valid @RequestBody NewMessage body)
@@ -34,6 +37,7 @@ public class MessageController {
     }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @JsonView(Views.Public.class)
     public ResponseEntity<List<Message>> get(@RequestHeader("X-User-Id") Long userId,
                                              @RequestParam("with") Long with)
             throws UserNotFoundException {

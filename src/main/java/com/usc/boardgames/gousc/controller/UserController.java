@@ -79,7 +79,7 @@ public class UserController {
     @PutMapping(path = "{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     @JsonView(Views.Public.class)
     public ResponseEntity<User> update(@PathVariable Long id, @RequestBody User user)
-            throws UserNotFoundException {
+            throws UserNotFoundException, DuplicateUserException {
         return ResponseEntity.ok(users.update(id, user));
     }
 }
