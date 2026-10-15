@@ -84,8 +84,17 @@ Las cuatro tablas usan **Lombok** para no escribir accesores a mano:
 @Getter        // genera todos los getXxx()
 @Setter        // genera todos setXxx()
 @Accessors(chain = true)  // los setters devuelven this, para poder encadenar
+@NoArgsConstructor        // constructor vacío que exige JPA
 public class Game { ... }
 ```
+
+Lombok también se usa en el resto de capas:
+
+- **Servicios y controladores**: `@RequiredArgsConstructor` genera el constructor con
+  los campos `final`, que Spring usa para la inyección de dependencias (sin `@Autowired`).
+- **Excepciones**: `@Getter` en lugar de escribir los getters del dato que lleva cada una.
+- Los **DTOs** son `record`, así que no necesitan Lombok: Java ya genera constructor,
+  accesores, `equals`, `hashCode` y `toString`.
 
 ### 2.3 `model/dto` — contratos de la API
 
@@ -527,7 +536,7 @@ sequenceDiagram
 | ELO K=32, solo RANKED, suma 0, mínimo 1 | Fórmula estándar; impide partidas amistosas inflando el ranking. |
 | Servicios `@Transactional` | Cada operación de negocio es una transacción atómica (partida + ELO juntos). |
 | Errores `checked` + `ProblemDetail` | Patrón del ejemplo: el detalle del error incluye el id/dato que falló. |
-| Lombok en las entities | `@Getter @Setter` + `@Accessors(chain = true)` ahorran ~400 líneas de accesores. Con JDK 26 hace falta Lombok **1.18.48** (el 1.18.46 que trae Spring Boot 4.1.1 no compila). |
+| Lombok en entities, servicios, controladores y excepciones | `@Getter @Setter @NoArgsConstructor` + `@Accessors(chain = true)` en las entities, `@RequiredArgsConstructor` para la inyección y `@Getter` en las excepciones ahorran cientos de líneas repetitivas. Con JDK 26 hace falta Lombok **1.18.48** (el 1.18.46 que trae Spring Boot 4.1.1 no compila). |
 
 ---
 

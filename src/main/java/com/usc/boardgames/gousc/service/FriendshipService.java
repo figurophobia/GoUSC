@@ -8,7 +8,7 @@ import com.usc.boardgames.gousc.model.dto.Friendship;
 import com.usc.boardgames.gousc.model.dto.User;
 import com.usc.boardgames.gousc.model.entity.FriendshipStatus;
 import com.usc.boardgames.gousc.repository.FriendshipRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,16 +16,11 @@ import java.util.List;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class FriendshipService {
 
     private final FriendshipRepository friendshipRepository;
     private final UserService userService;
-
-    @Autowired
-    public FriendshipService(FriendshipRepository friendshipRepository, UserService userService) {
-        this.friendshipRepository = friendshipRepository;
-        this.userService = userService;
-    }
 
     public Friendship request(User requester, Long addresseeId)
             throws UserNotFoundException, DuplicateFriendshipException {

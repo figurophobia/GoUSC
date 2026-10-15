@@ -1,17 +1,17 @@
 package com.usc.boardgames.gousc.controller;
 
+import com.fasterxml.jackson.annotation.JsonView;
 import com.usc.boardgames.gousc.exception.DuplicateFriendshipException;
 import com.usc.boardgames.gousc.exception.FriendshipNotFoundException;
 import com.usc.boardgames.gousc.exception.FriendshipStateException;
 import com.usc.boardgames.gousc.exception.UserNotFoundException;
-import com.fasterxml.jackson.annotation.JsonView;
 import com.usc.boardgames.gousc.model.dto.Friendship;
 import com.usc.boardgames.gousc.model.dto.FriendshipRequest;
 import com.usc.boardgames.gousc.model.dto.User;
 import com.usc.boardgames.gousc.model.dto.Views;
 import com.usc.boardgames.gousc.service.FriendshipService;
 import com.usc.boardgames.gousc.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,16 +22,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("friendships")
+@RequiredArgsConstructor
 public class FriendshipController {
 
     private final FriendshipService friendships;
     private final UserService users;
-
-    @Autowired
-    public FriendshipController(FriendshipService friendships, UserService users) {
-        this.friendships = friendships;
-        this.users = users;
-    }
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @JsonView(Views.Public.class)

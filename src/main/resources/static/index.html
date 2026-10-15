@@ -1,300 +1,318 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="dark">
-    <meta name="theme-color" content="#0b1020">
-    <meta name="description" content="GoUSC - Plataforma online de Go: partidas, ranking y chat.">
-    <title>GoUSC - Go Online</title>
+    <meta name="theme-color" content="#161512">
+    <meta name="description" content="GoUSC - Juega al Go online: partidas rápidas, ranking ELO, amigos y chat.">
+    <title>GoUSC · Go online</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Shippori+Mincho:wght@600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+    <script>
+        /* aplica el tema guardado antes de pintar (evita el parpadeo) */
+        try { const t = localStorage.getItem('gousc_theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+    </script>
 </head>
 <body>
+    <!-- ================================================================ iconos -->
+    <svg class="sprite" aria-hidden="true">
+        <symbol id="i-lobby" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></symbol>
+        <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></symbol>
+        <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-3-5.2"/></symbol>
+        <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-5A8 8 0 1 1 21 12Z"/></symbol>
+        <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></symbol>
+        <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+        <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></symbol>
+        <symbol id="i-logout" viewBox="0 0 24 24"><path d="M15 17l5-5-5-5M20 12H9M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"/></symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6.3M20 5v6h-6"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></symbol>
+        <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
+        <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4.5a1.5 1.5 0 0 1 3 0V11M14 10.5V6a1.5 1.5 0 0 1 3 0v8a7 7 0 0 1-7 7h-.5a6 6 0 0 1-5-2.7L2.8 15a1.6 1.6 0 0 1 2.6-1.8L8 15.5"/></symbol>
+        <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+        <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-6 16-3-7z"/><path d="M11 13l9-9"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+        <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></symbol>
+        <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+        <symbol id="i-scroll"viewBox="0 0 24 24"><path d="M7 4h11a2 2 0 0 1 2 2v1h-4M7 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7M7 4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2M10 10h5M10 14h5"/></symbol>
+    </svg>
+
     <div id="app">
-        <!-- ============================ LOGIN / REGISTRO ============================ -->
-        <div id="loginSection" class="authScreen section">
-            <div class="authGlow" aria-hidden="true"></div>
-            <div class="authCard">
-                <div class="brand brandLg">
-                    <span class="brandMark" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-                            <rect x="3" y="3" width="18" height="18" rx="4.5"></rect>
-                            <path d="M9 3.6v16.8M15 3.6v16.8M3.6 9h16.8M3.6 15h16.8"></path>
-                            <circle cx="15" cy="9" r="2.7" fill="currentColor" stroke="none"></circle>
-                        </svg>
-                    </span>
-                    <span class="brandText">Go<span class="brandAccent">USC</span></span>
-                </div>
-                <p class="authTagline">Juega Go online, sube tu ELO y desafía a tus amigos.</p>
-
-                <div class="tabs" role="tablist">
-                    <button class="tab active" data-tab="loginTab" type="button">Iniciar sesión</button>
-                    <button class="tab" data-tab="registerTab" type="button">Registrarse</button>
-                </div>
-
-                <div id="loginTab" class="tabContent active">
-                    <form id="loginForm" novalidate>
-                        <label class="field">
-                            <span class="fieldLabel">Usuario</span>
-                            <input type="text" id="loginUsername" placeholder="Tu nombre de usuario" autocomplete="username" required>
-                        </label>
-                        <label class="field">
-                            <span class="fieldLabel">Contraseña</span>
-                            <input type="password" id="loginPassword" placeholder="Tu contraseña" autocomplete="current-password" required>
-                        </label>
-                        <button type="submit" class="btn btnPrimary btnBlock">Entrar</button>
-                        <div id="loginError" class="formError" role="alert"></div>
-                    </form>
-                </div>
-
-                <div id="registerTab" class="tabContent">
-                    <form id="registerForm" novalidate>
-                        <label class="field">
-                            <span class="fieldLabel">Usuario</span>
-                            <input type="text" id="regUsername" placeholder="Mínimo 3 caracteres" autocomplete="username" required>
-                        </label>
-                        <label class="field">
-                            <span class="fieldLabel">Contraseña</span>
-                            <input type="password" id="regPassword" placeholder="Mínimo 3 caracteres" autocomplete="new-password" required>
-                        </label>
-                        <label class="field">
-                            <span class="fieldLabel">Email <span class="fieldHint">(opcional)</span></span>
-                            <input type="email" id="regEmail" placeholder="tu@email.com" autocomplete="email">
-                        </label>
-                        <button type="submit" class="btn btnPrimary btnBlock">Crear cuenta</button>
-                        <div id="regError" class="formError" role="alert"></div>
-                    </form>
+        <!-- =========================================================== ACCESO -->
+        <section id="loginSection" class="auth">
+            <div class="authArt">
+                <div class="authArtInner">
+                    <canvas id="heroBoard" width="420" height="420" aria-hidden="true"></canvas>
+                    <blockquote class="authQuote">
+                        <span class="authKanji" aria-hidden="true">囲碁</span>
+                        <p>«Pierde tus primeras cincuenta partidas lo más rápido posible.»</p>
+                        <cite>Proverbio de Go</cite>
+                    </blockquote>
                 </div>
             </div>
-            <p class="authFootnote">Plataforma de partidas y ranking · USC</p>
-        </div>
 
-        <!-- ============================ APP PRINCIPAL ============================ -->
-        <div id="mainSection" class="appShell section" style="display:none">
-            <header class="header">
-                <div class="headerInner">
-                    <div class="brand">
-                        <span class="brandMark" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-                                <rect x="3" y="3" width="18" height="18" rx="4.5"></rect>
-                                <path d="M9 3.6v16.8M15 3.6v16.8M3.6 9h16.8M3.6 15h16.8"></path>
-                                <circle cx="15" cy="9" r="2.7" fill="currentColor" stroke="none"></circle>
-                            </svg>
-                        </span>
-                        <span class="brandText">Go<span class="brandAccent">USC</span></span>
+            <div class="authPanel">
+                <div class="authCard">
+                    <div class="brand brandLg">
+                        <span class="seal" aria-hidden="true">碁</span>
+                        <span class="wordmark">Go<b>USC</b></span>
+                    </div>
+                    <p class="authTagline">El juego más antiguo del mundo, ahora en la USC. Partidas rápidas, ranking ELO y tus amigos a un clic.</p>
+
+                    <div class="segmented" role="tablist">
+                        <button class="segBtn active" data-tab="loginTab" type="button" role="tab">Entrar</button>
+                        <button class="segBtn" data-tab="registerTab" type="button" role="tab">Crear cuenta</button>
                     </div>
 
+                    <div id="loginTab" class="tabPane active">
+                        <form id="loginForm" novalidate>
+                            <label class="field">
+                                <span class="fieldLabel">Usuario</span>
+                                <input type="text" id="loginUsername" placeholder="Tu nombre de jugador" autocomplete="username" required>
+                            </label>
+                            <label class="field">
+                                <span class="fieldLabel">Contraseña</span>
+                                <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required>
+                            </label>
+                            <div id="loginError" class="formError" role="alert"></div>
+                            <button type="submit" class="btn btnPrimary btnBlock btnLg">Entrar a jugar</button>
+                        </form>
+                        <p class="authHint">¿Solo quieres probar? Usa <code>ana</code> / <code>ana123</code>.</p>
+                    </div>
+
+                    <div id="registerTab" class="tabPane">
+                        <form id="registerForm" novalidate>
+                            <label class="field">
+                                <span class="fieldLabel">Usuario</span>
+                                <input type="text" id="regUsername" placeholder="Entre 3 y 50 caracteres" autocomplete="username" required>
+                            </label>
+                            <label class="field">
+                                <span class="fieldLabel">Contraseña</span>
+                                <input type="password" id="regPassword" placeholder="Mínimo 3 caracteres" autocomplete="new-password" required>
+                            </label>
+                            <label class="field">
+                                <span class="fieldLabel">Email <span class="fieldHint">opcional</span></span>
+                                <input type="email" id="regEmail" placeholder="tu@usc.gal" autocomplete="email">
+                            </label>
+                            <div id="regError" class="formError" role="alert"></div>
+                            <button type="submit" class="btn btnPrimary btnBlock btnLg">Crear cuenta</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================= APLICACIÓN -->
+        <div id="mainSection" class="shell" hidden>
+            <header class="topbar">
+                <div class="topbarInner">
+                    <button class="brand brandBtn" id="brandHome" type="button" title="Ir al lobby">
+                        <span class="seal" aria-hidden="true">碁</span>
+                        <span class="wordmark">Go<b>USC</b></span>
+                    </button>
+
                     <nav class="nav" aria-label="Navegación principal">
-                        <button class="navBtn active" data-view="lobbyView" type="button">
-                            <svg class="navIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"></rect><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"></rect><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"></rect><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"></rect></svg>
-                            <span>Lobby</span>
-                        </button>
-                        <button class="navBtn" data-view="rankingView" type="button">
-                            <svg class="navIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"></path></svg>
-                            <span>Ranking</span>
-                        </button>
-                        <button class="navBtn" data-view="friendsView" type="button">
-                            <svg class="navIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M3 20a6 6 0 0 1 12 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-3-5.2"></path></svg>
-                            <span>Amigos</span>
-                        </button>
-                        <button class="navBtn" data-view="chatView" type="button">
-                            <svg class="navIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-5A8 8 0 1 1 21 12Z"></path></svg>
-                            <span>Chat</span>
-                        </button>
-                        <button class="navBtn" data-view="profileView" type="button">
-                            <svg class="navIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"></circle><path d="M4.5 20a7.5 7.5 0 0 1 15 0"></path></svg>
-                            <span>Perfil</span>
-                        </button>
+                        <button class="navBtn active" data-view="lobbyView" type="button"><svg class="ic"><use href="#i-lobby"/></svg><span>Jugar</span></button>
+                        <button class="navBtn" data-view="rankingView" type="button"><svg class="ic"><use href="#i-trophy"/></svg><span>Ranking</span></button>
+                        <button class="navBtn" data-view="friendsView" type="button"><svg class="ic"><use href="#i-users"/></svg><span>Amigos</span><span class="navBadge" id="pendingBadge" hidden>0</span></button>
+                        <button class="navBtn" data-view="chatView" type="button"><svg class="ic"><use href="#i-chat"/></svg><span>Chat</span></button>
                     </nav>
 
-                    <div class="userInfo">
-                        <button class="userChip" id="userChip" type="button" title="Ver mi perfil">
+                    <div class="topActions">
+                        <button class="iconBtn" id="soundToggle" type="button" title="Sonido"><svg class="ic"><use href="#i-sound"/></svg></button>
+                        <button class="iconBtn" id="themeToggle" type="button" title="Cambiar tema"><svg class="ic"><use href="#i-sun"/></svg></button>
+                        <button class="userChip" id="userChip" type="button" title="Mi perfil">
                             <span class="avatar avatarSm" id="headerAvatar">?</span>
-                            <span class="userMeta">
+                            <span class="userChipText">
                                 <span id="currentUser">-</span>
-                                <span class="userMetaLabel">Jugador</span>
+                                <span class="userChipElo"><span id="currentElo">1500</span> ELO</span>
                             </span>
                         </button>
-                        <span class="eloChip" title="Puntuación ELO">ELO <strong id="currentElo">1500</strong></span>
-                        <button id="logoutBtn" class="btn btnGhost btnSm" type="button">
-                            <svg class="btnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 17l5-5-5-5M20 12H9M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"></path></svg>
-                            <span>Salir</span>
-                        </button>
+                        <button class="iconBtn" id="logoutBtn" type="button" title="Cerrar sesión"><svg class="ic"><use href="#i-logout"/></svg></button>
                     </div>
                 </div>
             </header>
 
-            <main class="main">
-                <!-- ---------------------------- LOBBY ---------------------------- -->
-                <div id="lobbyView" class="view active">
-                    <div class="viewHead">
-                        <h3 class="viewTitle">Lobby</h3>
-                        <p class="viewSub">Crea una partida nueva o únete a una sala abierta.</p>
-                    </div>
-                    <div class="card lobbyActions">
-                        <label class="field fieldInline">
-                            <span class="fieldLabel">Tablero</span>
-                            <select id="boardSizeSelect">
-                                <option value="NINE">9x9</option>
-                                <option value="THIRTEEN">13x13</option>
-                                <option value="NINETEEN">19x19</option>
-                            </select>
-                        </label>
-                        <label class="field fieldInline">
-                            <span class="fieldLabel">Modo</span>
-                            <select id="gameModeSelect">
-                                <option value="CASUAL">Casual</option>
-                                <option value="RANKED">Ranked</option>
-                            </select>
-                        </label>
-                        <div class="lobbyBtns">
-                            <button id="createGameBtn" class="btn btnPrimary" type="button">Crear partida</button>
-                            <button id="refreshLobbyBtn" class="btn btnGhost" type="button">
-                                <svg class="btnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 6.3M20 5v6h-6"></path></svg>
-                                <span>Actualizar</span>
-                            </button>
-                        </div>
-                        <span class="liveTag"><span class="liveDot"></span> Actualización automática</span>
-                    </div>
-                    <div class="gamesList" id="gamesList"></div>
-                </div>
+            <main class="page">
+                <!-- ------------------------------------------------------ LOBBY -->
+                <section id="lobbyView" class="view active">
+                    <div class="lobbyGrid">
+                        <div class="lobbyMain">
+                            <section class="panel quickPanel">
+                                <header class="panelHead">
+                                    <h2 class="panelTitle">Partida rápida</h2>
+                                    <span class="panelSub">Elige tablero y modo: la partida se crea al instante</span>
+                                </header>
+                                <div class="poolGrid" id="poolGrid">
+                                    <button class="pool" data-size="NINE" data-mode="CASUAL" type="button"><span class="poolSize">9×9</span><span class="poolMode">Casual</span></button>
+                                    <button class="pool" data-size="THIRTEEN" data-mode="CASUAL" type="button"><span class="poolSize">13×13</span><span class="poolMode">Casual</span></button>
+                                    <button class="pool" data-size="NINETEEN" data-mode="CASUAL" type="button"><span class="poolSize">19×19</span><span class="poolMode">Casual</span></button>
+                                    <button class="pool pool--ranked" data-size="NINE" data-mode="RANKED" type="button"><span class="poolSize">9×9</span><span class="poolMode">Ranked</span></button>
+                                    <button class="pool pool--ranked" data-size="THIRTEEN" data-mode="RANKED" type="button"><span class="poolSize">13×13</span><span class="poolMode">Ranked</span></button>
+                                    <button class="pool pool--ranked" data-size="NINETEEN" data-mode="RANKED" type="button"><span class="poolSize">19×19</span><span class="poolMode">Ranked</span></button>
+                                </div>
+                            </section>
 
-                <!-- ---------------------------- RANKING ---------------------------- -->
-                <div id="rankingView" class="view">
-                    <div class="viewHead">
-                        <h3 class="viewTitle">Ranking</h3>
-                        <p class="viewSub">Clasificación de jugadores ordenada por puntuación ELO.</p>
+                            <section class="panel">
+                                <header class="panelHead panelHeadRow">
+                                    <div class="tabsLine" role="tablist" id="lobbyTabs">
+                                        <button class="lineTab active" data-filter="open" type="button">Salas abiertas <span class="tabCount" id="countOpen">0</span></button>
+                                        <button class="lineTab" data-filter="live" type="button">En juego <span class="tabCount" id="countLive">0</span></button>
+                                        <button class="lineTab" data-filter="done" type="button">Terminadas <span class="tabCount" id="countDone">0</span></button>
+                                    </div>
+                                    <div class="panelTools">
+                                        <span class="liveTag"><span class="liveDot"></span>En directo</span>
+                                        <button class="iconBtn iconBtnSm" id="refreshLobbyBtn" type="button" title="Actualizar"><svg class="ic"><use href="#i-refresh"/></svg></button>
+                                    </div>
+                                </header>
+                                <div class="gameTable" id="gamesList"></div>
+                            </section>
+                        </div>
+
+                        <aside class="lobbySide">
+                            <section class="panel meCard" id="sideMe"></section>
+                            <section class="panel">
+                                <header class="panelHead panelHeadRow">
+                                    <h3 class="panelTitle panelTitleSm"><svg class="ic"><use href="#i-trophy"/></svg> Mejores jugadores</h3>
+                                    <button class="linkBtn" data-goto="rankingView" type="button">Ver todo</button>
+                                </header>
+                                <ol class="miniRank" id="sideTop"></ol>
+                            </section>
+                            <section class="panel proverb">
+                                <span class="proverbMark" aria-hidden="true">諺</span>
+                                <h3 class="proverbLabel">Proverbio del día</h3>
+                                <p class="proverbText" id="proverbText"></p>
+                            </section>
+                        </aside>
                     </div>
-                    <div class="card tableCard">
+                </section>
+
+                <!-- ---------------------------------------------------- RANKING -->
+                <section id="rankingView" class="view">
+                    <header class="viewHead">
+                        <h1 class="viewTitle">Ranking</h1>
+                        <p class="viewSub">Clasificación por ELO. Solo las partidas <strong>Ranked</strong> mueven la puntuación.</p>
+                    </header>
+                    <div class="podium" id="podium"></div>
+                    <section class="panel tablePanel">
                         <div class="tableScroll">
                             <table class="table">
                                 <thead>
                                     <tr>
                                         <th class="colRank">#</th>
                                         <th>Jugador</th>
-                                        <th class="colElo">ELO</th>
-                                        <th class="colNum">W</th>
-                                        <th class="colNum">L</th>
+                                        <th class="colNum">ELO</th>
+                                        <th class="colNum">Victorias</th>
+                                        <th class="colNum">Derrotas</th>
+                                        <th class="colNum colHide">% vict.</th>
                                     </tr>
                                 </thead>
                                 <tbody id="rankingBody"></tbody>
                             </table>
                         </div>
-                    </div>
-                </div>
+                    </section>
+                </section>
 
-                <!-- ---------------------------- AMIGOS ---------------------------- -->
-                <div id="friendsView" class="view">
-                    <div class="viewHead">
-                        <h3 class="viewTitle">Amigos</h3>
+                <!-- ----------------------------------------------------- AMIGOS -->
+                <section id="friendsView" class="view">
+                    <header class="viewHead">
+                        <h1 class="viewTitle">Amigos</h1>
                         <p class="viewSub">Añade jugadores por su ID y acepta las solicitudes que recibas.</p>
-                    </div>
-                    <div class="card friendActions">
-                        <label class="field fieldGrow">
-                            <span class="fieldLabel">ID del jugador</span>
-                            <input type="text" id="friendIdInput" placeholder="Ej. 3" inputmode="numeric">
-                        </label>
-                        <button id="addFriendBtn" class="btn btnPrimary" type="button">
-                            <svg class="btnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="3.5"></circle><path d="M4 20a6 6 0 0 1 12 0M18 8v6M21 11h-6"></path></svg>
-                            <span>Enviar solicitud</span>
-                        </button>
-                    </div>
-
-                    <div class="card">
-                        <div class="cardHead">
-                            <h4 class="cardTitle">Solicitudes pendientes</h4>
-                            <span class="countChip" id="pendingCount">0</span>
+                    </header>
+                    <div class="friendsGrid">
+                        <div class="friendsCol">
+                            <section class="panel">
+                                <header class="panelHead"><h2 class="panelTitle panelTitleSm">Añadir amigo</h2></header>
+                                <form class="inlineForm" id="addFriendForm" novalidate>
+                                    <input type="text" id="friendIdInput" placeholder="ID del jugador, p. ej. 3" inputmode="numeric" autocomplete="off">
+                                    <button id="addFriendBtn" class="btn btnPrimary" type="submit"><svg class="ic"><use href="#i-plus"/></svg><span>Enviar</span></button>
+                                </form>
+                                <p class="muted small">Tu ID aparece en tu perfil. Compártelo para que te agreguen.</p>
+                            </section>
+                            <section class="panel">
+                                <header class="panelHead panelHeadRow">
+                                    <h2 class="panelTitle panelTitleSm">Solicitudes recibidas</h2>
+                                    <span class="countChip" id="pendingCount">0</span>
+                                </header>
+                                <div id="pendingList" class="itemList"></div>
+                            </section>
                         </div>
-                        <div id="pendingList" class="itemList"></div>
+                        <section class="panel">
+                            <header class="panelHead panelHeadRow">
+                                <h2 class="panelTitle panelTitleSm">Mis amigos</h2>
+                                <span class="countChip" id="friendsCount">0</span>
+                            </header>
+                            <div id="friendsList" class="itemList"></div>
+                        </section>
                     </div>
+                </section>
 
-                    <div class="card">
-                        <div class="cardHead">
-                            <h4 class="cardTitle">Mis amigos</h4>
-                            <span class="countChip" id="friendsCount">0</span>
-                        </div>
-                        <div id="friendsList" class="itemList"></div>
-                    </div>
-                </div>
-
-                <!-- ---------------------------- CHAT ---------------------------- -->
-                <div id="chatView" class="view">
-                    <div class="viewHead">
-                        <h3 class="viewTitle">Chat privado</h3>
-                        <p class="viewSub">Habla con tus amigos: la conversación se actualiza sola.</p>
-                    </div>
-                    <div class="card chatPanel">
-                        <div class="chatToolbar">
-                            <label class="field fieldInline fieldGrow">
-                                <span class="fieldLabel">Conversación con</span>
-                                <select id="chatUserSelect"></select>
-                            </label>
-                            <button id="loadChatBtn" class="btn btnGhost btnSm" type="button">Cargar</button>
-                            <span class="liveTag"><span class="liveDot"></span> En vivo</span>
-                        </div>
-                        <div id="privateChat" class="chatBox"></div>
-                        <div class="chatInput">
-                            <input type="text" id="privateMsgInput" placeholder="Escribe un mensaje..." maxlength="1000" autocomplete="off">
-                            <button id="sendPrivateBtn" class="btn btnPrimary" type="button">Enviar</button>
+                <!-- ------------------------------------------------------- CHAT -->
+                <section id="chatView" class="view">
+                    <div class="chatLayout panel">
+                        <aside class="convList">
+                            <header class="convHead">
+                                <h2 class="panelTitle panelTitleSm">Conversaciones</h2>
+                            </header>
+                            <div id="convItems" class="convItems"></div>
+                        </aside>
+                        <div class="convMain">
+                            <header class="convTop" id="convTop">
+                                <span class="muted">Elige una conversación</span>
+                            </header>
+                            <div id="privateChat" class="chatBox"></div>
+                            <form class="chatInput" id="privateChatForm" novalidate>
+                                <input type="text" id="privateMsgInput" placeholder="Escribe un mensaje..." maxlength="1000" autocomplete="off">
+                                <button id="sendPrivateBtn" class="iconBtn iconBtnAccent" type="submit" title="Enviar"><svg class="ic"><use href="#i-send"/></svg></button>
+                            </form>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- ---------------------------- PERFIL ---------------------------- -->
-                <div id="profileView" class="view">
-                    <div class="viewHead">
-                        <h3 class="viewTitle">Perfil</h3>
-                        <p class="viewSub">Tu cuenta, tus estadísticas y tu historial de partidas.</p>
+                <!-- ----------------------------------------------------- PERFIL -->
+                <section id="profileView" class="view">
+                    <section class="panel profileHero">
+                        <span class="avatar avatarXl" id="profileAvatar">?</span>
+                        <div class="profileId">
+                            <h1 class="profileName" id="profileUsername">-</h1>
+                            <div class="profileMeta">
+                                <span class="idTag">ID <code id="profileId">-</code>
+                                    <button id="copyIdBtn" class="iconBtn iconBtnSm" type="button" title="Copiar ID"><svg class="ic"><use href="#i-copy"/></svg></button>
+                                </span>
+                                <span class="muted">Miembro desde <strong id="profileSince">-</strong></span>
+                            </div>
+                        </div>
+                        <div class="eloBig">
+                            <span class="eloBigValue" id="profileElo">1500</span>
+                            <span class="eloBigLabel">ELO</span>
+                        </div>
+                    </section>
+
+                    <div class="statGrid">
+                        <div class="stat"><span class="statValue good" id="profileWins">0</span><span class="statLabel">Victorias</span></div>
+                        <div class="stat"><span class="statValue bad" id="profileLosses">0</span><span class="statLabel">Derrotas</span></div>
+                        <div class="stat"><span class="statValue" id="profileWinrate">—</span><span class="statLabel">% victorias</span></div>
+                        <div class="stat"><span class="statValue" id="profileGames">0</span><span class="statLabel">Partidas</span></div>
                     </div>
 
                     <div class="profileGrid">
-                        <section class="card profileCard">
-                            <div class="profileTop">
-                                <span class="avatar avatarLg" id="profileAvatar">?</span>
-                                <div class="profileIdBlock">
-                                    <div class="profileName" id="profileUsername">-</div>
-                                    <div class="profileIdRow">
-                                        <span class="idLabel">ID</span>
-                                        <code class="idValue" id="profileId">-</code>
-                                        <button id="copyIdBtn" class="btn btnIconOnly" type="button" title="Copiar ID" aria-label="Copiar ID">
-                                            <svg class="btnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2.5"></rect><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"></path></svg>
-                                        </button>
-                                    </div>
-                                    <p class="profileHint">Comparte tu ID para que otros jugadores te agreguen como amigo.</p>
-                                </div>
-                                <div class="eloBadge">
-                                    <span class="eloBadgeLabel">ELO</span>
-                                    <span class="eloBadgeValue" id="profileElo">1500</span>
-                                </div>
-                            </div>
-
-                            <div class="statRow">
-                                <div class="stat">
-                                    <span class="statValue win" id="profileWins">0</span>
-                                    <span class="statLabel">Victorias</span>
-                                </div>
-                                <div class="stat">
-                                    <span class="statValue loss" id="profileLosses">0</span>
-                                    <span class="statLabel">Derrotas</span>
-                                </div>
-                                <div class="stat">
-                                    <span class="statValue" id="profileWinrate">0%</span>
-                                    <span class="statLabel">Winrate</span>
-                                </div>
-                                <div class="stat">
-                                    <span class="statValue" id="profileGames">0</span>
-                                    <span class="statLabel">Partidas</span>
-                                </div>
-                            </div>
-
-                            <div class="metaRow">Miembro desde <strong id="profileSince">-</strong></div>
+                        <section class="panel">
+                            <header class="panelHead panelHeadRow">
+                                <h2 class="panelTitle panelTitleSm"><svg class="ic"><use href="#i-history"/></svg> Historial</h2>
+                                <button id="refreshHistoryBtn" class="iconBtn iconBtnSm" type="button" title="Actualizar"><svg class="ic"><use href="#i-refresh"/></svg></button>
+                            </header>
+                            <div id="historyList" class="itemList"></div>
                         </section>
-
-                        <section class="card">
-                            <div class="cardHead">
-                                <h4 class="cardTitle">Editar perfil</h4>
-                            </div>
+                        <section class="panel">
+                            <header class="panelHead"><h2 class="panelTitle panelTitleSm">Editar perfil</h2></header>
                             <form id="profileForm" novalidate>
                                 <label class="field">
                                     <span class="fieldLabel">Nombre de usuario</span>
@@ -305,90 +323,75 @@
                                     <input type="email" id="editEmail" autocomplete="email">
                                 </label>
                                 <label class="field">
-                                    <span class="fieldLabel">Nueva contraseña <span class="fieldHint">(opcional)</span></span>
-                                    <input type="password" id="editPassword" placeholder="Déjalo en blanco para no cambiarla" autocomplete="new-password">
+                                    <span class="fieldLabel">Nueva contraseña <span class="fieldHint">opcional</span></span>
+                                    <input type="password" id="editPassword" placeholder="Déjalo vacío para no cambiarla" autocomplete="new-password">
                                 </label>
                                 <button type="submit" id="saveProfileBtn" class="btn btnPrimary">Guardar cambios</button>
                             </form>
                         </section>
                     </div>
+                </section>
 
-                    <section class="card">
-                        <div class="cardHead">
-                            <h4 class="cardTitle">Historial de partidas</h4>
-                            <button id="refreshHistoryBtn" class="btn btnGhost btnSm" type="button">Actualizar</button>
-                        </div>
-                        <div id="historyList" class="itemList"></div>
-                    </section>
-                </div>
-            </main>
-        </div>
-
-        <!-- ============================ PARTIDA ============================ -->
-        <div id="gameSection" class="appShell section" style="display:none">
-            <header class="header gameHeader">
-                <div class="headerInner">
-                    <div class="brand">
-                        <span class="brandMark" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-                                <rect x="3" y="3" width="18" height="18" rx="4.5"></rect>
-                                <path d="M9 3.6v16.8M15 3.6v16.8M3.6 9h16.8M3.6 15h16.8"></path>
-                                <circle cx="15" cy="9" r="2.7" fill="currentColor" stroke="none"></circle>
-                            </svg>
-                        </span>
-                        <span class="brandText">Partida <span class="brandAccent">#<span id="gameIdSpan"></span></span></span>
-                    </div>
-                    <div class="gameMeta">
-                        <span id="gameStatus" class="statusChip">-</span>
-                        <span id="gameTurn" class="turnChip">-</span>
-                        <button id="backToLobbyBtn" class="btn btnGhost btnSm" type="button">
-                            <svg class="btnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
-                            <span>Volver al lobby</span>
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <main class="main gameMain">
-                <div class="gameLayout">
-                    <div class="boardContainer card">
-                        <div class="boardFrame">
-                            <canvas id="goBoard" width="600" height="600"></canvas>
-                        </div>
-                        <p class="boardHint">Haz clic sobre la intersección más cercana para colocar una piedra.</p>
-                    </div>
-
-                    <aside class="gameSidebar">
-                        <div class="card playersCard">
-                            <div class="playerRow" id="blackPlayer"></div>
-                            <div class="playerRow" id="whitePlayer"></div>
-                        </div>
-
-                        <div class="card resultCard" id="gameResult" style="display:none"></div>
-
-                        <div class="card actionsCard">
-                            <button id="passBtn" class="btn btnGhost" type="button">Pasar turno</button>
-                            <button id="leaveBtn" class="btn btnDanger" type="button">Abandonar</button>
-                        </div>
-
-                        <div class="card gameChat">
-                            <div class="cardHead">
-                                <h4 class="cardTitle">Chat de la partida</h4>
-                                <span class="liveTag"><span class="liveDot"></span> En vivo</span>
-                            </div>
+                <!-- ---------------------------------------------------- PARTIDA -->
+                <section id="gameView" class="view">
+                    <div class="gameLayout">
+                        <aside class="panel gameChat">
+                            <header class="panelHead panelHeadRow">
+                                <h2 class="panelTitle panelTitleSm"><svg class="ic"><use href="#i-chat"/></svg> Chat</h2>
+                                <span class="liveTag"><span class="liveDot"></span>En vivo</span>
+                            </header>
                             <div id="gameChatBox" class="chatBox chatBoxSm"></div>
-                            <div class="chatInput">
-                                <input type="text" id="gameMsgInput" placeholder="Mensaje..." maxlength="1000" autocomplete="off">
-                                <button id="sendGameMsgBtn" class="btn btnPrimary" type="button">Enviar</button>
+                            <form class="chatInput" id="gameChatForm" novalidate>
+                                <input type="text" id="gameMsgInput" placeholder="Di algo amable..." maxlength="1000" autocomplete="off">
+                                <button id="sendGameMsgBtn" class="iconBtn iconBtnAccent" type="submit" title="Enviar"><svg class="ic"><use href="#i-send"/></svg></button>
+                            </form>
+                        </aside>
+
+                        <div class="boardCol">
+                            <div class="boardFrame" id="boardFrame">
+                                <canvas id="goBoard" width="640" height="640"></canvas>
+                                <div class="boardOverlay" id="boardOverlay" hidden></div>
                             </div>
                         </div>
-                    </aside>
-                </div>
+
+                        <aside class="gameSide">
+                            <section class="panel gameInfo">
+                                <button class="linkBtn" id="backToLobbyBtn" type="button"><svg class="ic"><use href="#i-back"/></svg>Lobby</button>
+                                <div class="gameInfoMain">
+                                    <span class="gameInfoTitle">Partida <b>#<span id="gameIdSpan"></span></b></span>
+                                    <span class="gameInfoMeta" id="gameMeta">-</span>
+                                </div>
+                                <span id="gameStatus" class="chip">-</span>
+                            </section>
+
+                            <div class="sideStack">
+                                <div class="playerCard" id="topPlayer"></div>
+
+                                <section class="panel movesPanel">
+                                    <div class="turnBanner" id="gameTurn"></div>
+                                    <div class="moveList" id="moveList"></div>
+                                    <div class="gameActions" id="gameActions">
+                                        <button id="passBtn" class="btn btnGhost" type="button"><svg class="ic"><use href="#i-hand"/></svg><span>Pasar</span></button>
+                                        <button id="leaveBtn" class="btn btnGhost btnDangerText" type="button"><svg class="ic"><use href="#i-flag"/></svg><span>Abandonar</span></button>
+                                        <div class="confirmBar" id="leaveConfirm" hidden>
+                                            <span>¿Abandonar? Contará como derrota.</span>
+                                            <button id="leaveYes" class="btn btnDanger btnSm" type="button">Sí</button>
+                                            <button id="leaveNo" class="btn btnGhost btnSm" type="button">No</button>
+                                        </div>
+                                    </div>
+                                    <div class="resultBox" id="gameResult" hidden></div>
+                                </section>
+
+                                <div class="playerCard" id="bottomPlayer"></div>
+                            </div>
+                        </aside>
+                    </div>
+                </section>
             </main>
         </div>
     </div>
 
-    <div id="toastContainer" class="toastContainer" aria-live="polite" aria-atomic="false"></div>
+    <div id="toastContainer" class="toastContainer" aria-live="polite"></div>
 
     <script src="js/app.js"></script>
 </body>

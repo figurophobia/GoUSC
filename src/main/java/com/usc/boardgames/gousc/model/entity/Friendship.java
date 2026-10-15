@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Accessors(chain = true)
+@NoArgsConstructor
 public class Friendship {
 
     @Id
@@ -43,8 +45,6 @@ public class Friendship {
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
-
-    public Friendship() {}
 
     public Friendship(User requester, User addressee) {
         this.requester = requester;

@@ -8,7 +8,7 @@ import com.usc.boardgames.gousc.model.dto.Credentials;
 import com.usc.boardgames.gousc.model.dto.User;
 import com.usc.boardgames.gousc.model.dto.Views;
 import com.usc.boardgames.gousc.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -22,14 +22,10 @@ import java.util.List;
 
 @RestController
 @RequestMapping("users")
+@RequiredArgsConstructor
 public class UserController {
 
     private final UserService users;
-
-    @Autowired
-    public UserController(UserService users) {
-        this.users = users;
-    }
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @JsonView(Views.Public.class)

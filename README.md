@@ -63,9 +63,9 @@ GoUSC/
     ├── sql/users.sql                # Semilla idempotente de usuarios
     └── static/                      # Frontend (se sirve en http://localhost:8080)
         ├── index.html               # Vista única: login, lobby, ranking, amigos, chat, perfil y partida
-        ├── css/style.css            # Diseño dark premium + responsive (variables CSS)
+        ├── css/style.css            # Sistema de diseño (temas oscuro/claro, responsive)
         ├── js/app.js                # Toda la lógica del cliente (sin dependencias)
-        └── favicon.svg              # Icono de la pestaña
+        └── favicon.svg              # Icono: sello rojo con piedras
 ```
 
 ## API REST (resumen)
@@ -117,19 +117,27 @@ Errores en formato `application/problem+json` (`type`, `title`, `detail`, `statu
 
 ## Funcionalidades del frontend
 
-- **Login/registro** con validaciones y avisos de error en el propio formulario.
-- **Lobby**: crear partida (9×9/13×13/19×19, casual/ranked), unirse, abandonar y lista
-  de partidas **que se actualiza sola** sin recargar la página.
-- **Partida**: tablero de Go dibujado en canvas con snap a la intersección más cercana,
-  estrellas, etiquetas A-T/1-N, marca de último movimiento, turno, pasar, abandonar,
-  resultado final y chat de la partida en vivo.
-- **Ranking**: podios + tabla con ELO, victorias/derrotas y fila propia destacada.
-- **Amigos**: enviar solicitud por ID, aceptar/rechazar y acceso directo al chat.
-- **Chat**: conversaciones privadas con actualización automática y envío con Enter.
-- **Perfil**: avatar, ID copiable, ELO, estadísticas, historial de partidas con badge
-  de victoria/derrota y edición de nombre, email y contraseña.
-- **Avisos**: sistema de toasts (info/éxito/error) en lugar de `alert()`, con mapeo de
-  los errores de jugada del backend (turno, casilla ocupada, suicidio, ko).
+Diseño propio inspirado en la sobriedad de Lichess, con identidad de Go: sello *hanko*
+rojo con el kanji 碁, tablero de madera de kaya, piedras de pizarra y concha y tipografía
+Shippori Mincho. Todos los recursos (veta de la madera, piedras, sonidos, iconos) se
+generan en el propio cliente: no se usan imágenes ni sonidos de terceros.
+
+- **Acceso**: pantalla dividida con tablero decorativo y formulario de entrada/registro
+  (al registrarse se inicia sesión automáticamente).
+- **Lobby**: *partida rápida* con 6 botones (9×9/13×13/19×19 × Casual/Ranked), pestañas
+  de salas abiertas / en juego / terminadas que se actualizan solas, tarjeta con tus
+  estadísticas, top 5 del ranking y un proverbio de Go diferente cada día.
+- **Partida**: goban en canvas con veta de madera procedural, fila 1 abajo como en un
+  tablero real, piedra fantasma al pasar el ratón, última jugada marcada, lista de
+  jugadas numerada, presas, pasar/abandonar con confirmación, pantalla de espera de
+  rival, resultado con puntuación y cambio de ELO, chat de partida y modo espectador.
+- **Sonido**: golpe de piedra, capturas y avisos sintetizados con WebAudio (se puede
+  silenciar). La pestaña avisa con «● Tu turno».
+- **Ranking**: podio de los tres primeros + tabla con ELO, victorias, derrotas y % de victorias.
+- **Amigos y chat**: solicitudes por ID con contador en la navegación y conversaciones
+  privadas estilo mensajería.
+- **Perfil**: avatar con color propio, ID copiable, estadísticas, historial y edición.
+- **Temas**: oscuro y claro (papel *washi*), recordado entre visitas.
 - **Responsive**: sin scroll horizontal en móvil (probado a 390 px) y `prefers-reduced-motion`.
 
 ## Historial de cambios

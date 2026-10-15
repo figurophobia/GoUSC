@@ -12,7 +12,7 @@ import com.usc.boardgames.gousc.model.entity.GameMode;
 import com.usc.boardgames.gousc.model.entity.GameStatus;
 import com.usc.boardgames.gousc.model.entity.StoneColor;
 import com.usc.boardgames.gousc.repository.GameRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +26,7 @@ import java.util.Map;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class GameService {
 
     private final GameRepository gameRepository;
@@ -33,16 +34,6 @@ public class GameService {
     private final GoRules goRules;
     private final EloService eloService;
     private final ObjectMapper objectMapper;
-
-    @Autowired
-    public GameService(GameRepository gameRepository, UserService userService,
-                       GoRules goRules, EloService eloService, ObjectMapper objectMapper) {
-        this.gameRepository = gameRepository;
-        this.userService = userService;
-        this.goRules = goRules;
-        this.eloService = eloService;
-        this.objectMapper = objectMapper;
-    }
 
     public com.usc.boardgames.gousc.model.dto.Game create(User creator, BoardSize size, GameMode mode)
             throws UserNotFoundException {

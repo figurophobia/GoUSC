@@ -8,7 +8,7 @@ import com.usc.boardgames.gousc.model.dto.User;
 import com.usc.boardgames.gousc.model.entity.GameStatus;
 import com.usc.boardgames.gousc.repository.GameRepository;
 import com.usc.boardgames.gousc.repository.MessageRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,19 +16,12 @@ import java.util.List;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class MessageService {
 
     private final MessageRepository messageRepository;
     private final GameRepository gameRepository;
     private final UserService userService;
-
-    @Autowired
-    public MessageService(MessageRepository messageRepository, GameRepository gameRepository,
-                          UserService userService) {
-        this.messageRepository = messageRepository;
-        this.gameRepository = gameRepository;
-        this.userService = userService;
-    }
 
     /** Mensaje privado entre dos usuarios (chat de amigos). */
     public Message sendPrivate(User sender, Long recipientId, String content)

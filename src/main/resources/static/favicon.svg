@@ -1,7 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#0b1020"/>
-  <rect x="9" y="9" width="46" height="46" rx="11" fill="none" stroke="#3b82f6" stroke-width="3"/>
-  <path d="M24.3 9.5v45M39.7 9.5v45M9.5 24.3h45M9.5 39.7h45" stroke="#3b82f6" stroke-width="2.4" opacity=".8" stroke-linecap="round"/>
-  <circle cx="39.7" cy="24.3" r="7.2" fill="#60a5fa"/>
-  <circle cx="24.3" cy="39.7" r="6.2" fill="#e2e8f0"/>
+  <defs>
+    <radialGradient id="b" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#7a7c80"/><stop offset=".35" stop-color="#2c2e32"/><stop offset="1" stop-color="#050607"/></radialGradient>
+    <radialGradient id="w" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff"/><stop offset=".6" stop-color="#eeeae1"/><stop offset="1" stop-color="#c2bbad"/></radialGradient>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="13" fill="#c8463b" transform="rotate(-4 32 32)"/>
+  <g stroke="#fff7ef" stroke-opacity=".35" stroke-width="2" transform="rotate(-4 32 32)">
+    <path d="M22 10v44M42 10v44M10 22h44M10 42h44"/>
+  </g>
+  <circle cx="22" cy="42" r="10" fill="url(#b)"/>
+  <circle cx="42" cy="22" r="10" fill="url(#w)"/>
 </svg>

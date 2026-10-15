@@ -6,7 +6,7 @@ import com.usc.boardgames.gousc.exception.UserNotFoundException;
 import com.usc.boardgames.gousc.model.dto.Credentials;
 import com.usc.boardgames.gousc.model.dto.User;
 import com.usc.boardgames.gousc.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -16,14 +16,10 @@ import java.util.List;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
-
-    @Autowired
-    public UserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
 
     public User create(User user) throws DuplicateUserException {
         var existing = userRepository.findByUsername(user.username());

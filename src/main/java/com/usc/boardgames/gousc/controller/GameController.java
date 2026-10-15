@@ -1,22 +1,22 @@
 package com.usc.boardgames.gousc.controller;
 
+import com.fasterxml.jackson.annotation.JsonView;
 import com.usc.boardgames.gousc.exception.GameFullException;
 import com.usc.boardgames.gousc.exception.GameNotFoundException;
 import com.usc.boardgames.gousc.exception.GameStateException;
 import com.usc.boardgames.gousc.exception.InvalidMoveException;
 import com.usc.boardgames.gousc.exception.UserNotFoundException;
-import com.fasterxml.jackson.annotation.JsonView;
 import com.usc.boardgames.gousc.model.dto.Game;
 import com.usc.boardgames.gousc.model.dto.Message;
 import com.usc.boardgames.gousc.model.dto.Move;
 import com.usc.boardgames.gousc.model.dto.NewGame;
-import com.usc.boardgames.gousc.model.dto.Views;
 import com.usc.boardgames.gousc.model.dto.NewMessage;
+import com.usc.boardgames.gousc.model.dto.Views;
 import com.usc.boardgames.gousc.model.entity.GameStatus;
 import com.usc.boardgames.gousc.service.GameService;
 import com.usc.boardgames.gousc.service.MessageService;
 import com.usc.boardgames.gousc.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,18 +27,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("games")
+@RequiredArgsConstructor
 public class GameController {
 
     private final GameService games;
     private final UserService users;
     private final MessageService messages;
-
-    @Autowired
-    public GameController(GameService games, UserService users, MessageService messages) {
-        this.games = games;
-        this.users = users;
-        this.messages = messages;
-    }
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @JsonView(Views.Public.class)

@@ -1,13 +1,13 @@
 package com.usc.boardgames.gousc.controller;
 
-import com.usc.boardgames.gousc.exception.UserNotFoundException;
 import com.fasterxml.jackson.annotation.JsonView;
+import com.usc.boardgames.gousc.exception.UserNotFoundException;
 import com.usc.boardgames.gousc.model.dto.Message;
 import com.usc.boardgames.gousc.model.dto.NewMessage;
 import com.usc.boardgames.gousc.model.dto.Views;
 import com.usc.boardgames.gousc.service.MessageService;
 import com.usc.boardgames.gousc.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,16 +16,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("messages")
+@RequiredArgsConstructor
 public class MessageController {
 
     private final MessageService messages;
     private final UserService users;
-
-    @Autowired
-    public MessageController(MessageService messages, UserService users) {
-        this.messages = messages;
-        this.users = users;
-    }
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @JsonView(Views.Public.class)

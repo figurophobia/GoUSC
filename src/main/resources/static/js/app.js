@@ -1,26 +1,40 @@
+'use strict';
+
+/* ==========================================================================
+   GoUSC · cliente web (JavaScript vanilla, sin dependencias)
+   ========================================================================== */
+
 const API_BASE = '';
+const TICK_MS = 2500;
+const BASE_TITLE = 'GoUSC · Go online';
 
 const state = {
     user: null,
-    currentGame: null,
-    currentGameId: null,
-    boardSize: 9,
+    view: 'lobbyView',
+    lobbyFilter: 'open',
     games: [],
+    ranking: [],
     friends: [],
     pending: [],
-    chatUsers: [],
-    privateChat: [],
-    gameChat: [],
-    ranking: [],
-    history: []
+    chatWith: null,
+    history: [],
+    game: null,
+    gameId: null
 };
 
 const $ = (id) => document.getElementById(id);
 
-const views = {
-    loginSection: $('loginSection'),
-    mainSection: $('mainSection'),
-    gameSection: $('gameSection')
+/* ------------------------------------------------------- almacenamiento -- */
+
+const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* modo privado */ } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) { /* modo privado */ } }
+};
+
+const prefs = {
+    theme: store.get('gousc_theme') || 'dark',
+    sound: store.get('gousc_sound') !== 'off'
 };
 
 /* ============================================================ utilidades === */
@@ -31,11 +45,31 @@ function esc(value) {
     }[c]));
 }
 
+function icon(name) {
+    return `<svg class="ic"><use href="#i-${name}"/></svg>`;
+}
+
 function initials(name) {
     const s = String(name || '?').trim();
     if (!s) return '?';
-    const parts = s.split(/\s+/);
+    const parts = s.split(/[\s._-]+/).filter(Boolean);
     return (parts.length > 1 ? parts[0][0] + parts[1][0] : s.slice(0, 2)).toUpperCase();
+}
+
+/** Tono estable por nombre: cada jugador tiene siempre el mismo color de avatar. */
+function hue(name) {
+    let h = 7;
+    for (const c of String(name || '')) h = (h * 31 + c.codePointAt(0)) >>> 0;
+    return h % 360;
+}
+
+function avatar(name, cls = 'avatarSm') {
+    return `<span class="avatar ${cls}" style="--hue:${hue(name)}">${esc(initials(name))}</span>`;
+}
+
+function setAvatar(el, name) {
+    el.textContent = initials(name);
+    el.style.setProperty('--hue', hue(name));
 }
 
 function fmtDate(iso) {
@@ -52,12 +86,39 @@ function fmtTime(iso) {
     return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 }
 
+function fmtAgo(iso) {
+    const d = new Date(iso);
+    if (!iso || isNaN(d)) return '';
+    const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+    if (s < 60) return 'ahora';
+    if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
+    if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
+    return fmtDate(iso);
+}
+
+const SIZE_LABEL = { NINE: '9×9', THIRTEEN: '13×13', NINETEEN: '19×19' };
+const SIZE_NUM = { NINE: 9, THIRTEEN: 13, NINETEEN: 19 };
+const MODE_LABEL = { CASUAL: 'Casual', RANKED: 'Ranked' };
+
+function modeChip(mode) {
+    return `<span class="chip ${mode === 'RANKED' ? 'chip--ranked' : ''}">${esc(MODE_LABEL[mode] || mode)}</span>`;
+}
+
+const STATUS = {
+    WAITING: { cls: 'chip--wait', text: 'Esperando' },
+    ACTIVE: { cls: 'chip--live', text: 'En juego' },
+    FINISHED: { cls: 'chip--done', text: 'Terminada' },
+    ABANDONED: { cls: 'chip--off', text: 'Abandonada' }
+};
+
+function statusChip(status) {
+    const s = STATUS[status] || { cls: '', text: status || '-' };
+    return `<span class="chip ${s.cls}">${esc(s.text)}</span>`;
+}
+
 function emptyState(title, sub) {
     return `<div class="emptyState">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3.5" y="3.5" width="17" height="17" rx="4.5"></rect>
-            <path d="M9 3.8v16.4M15 3.8v16.4M3.8 9h16.4M3.8 15h16.4"></path>
-        </svg>
+        <span class="emptyStones"><i></i><i></i></span>
         <strong>${esc(title)}</strong>
         ${sub ? `<span>${esc(sub)}</span>` : ''}
     </div>`;
@@ -65,39 +126,29 @@ function emptyState(title, sub) {
 
 /* ============================================================== toasts ==== */
 
-const TOAST_ICONS = {
-    success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>',
-    error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
-    warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4.5M12 17h.01M10.3 3.9 2.5 17.4A2 2 0 0 0 4.2 20.4h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>',
-    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>'
-};
-
-const TOAST_TITLES = {
-    success: 'Correcto',
-    error: 'Error',
-    warning: 'Aviso',
-    info: 'Información'
+const TOAST = {
+    success: { icon: 'check', title: 'Hecho' },
+    error: { icon: 'x', title: 'Error' },
+    warning: { icon: 'flag', title: 'Aviso' },
+    info: { icon: 'info', title: 'Información' }
 };
 
 function toast(type, message, title) {
     const container = $('toastContainer');
-    if (!container) return;
-    const kind = TOAST_ICONS[type] ? type : 'info';
+    const kind = TOAST[type] ? type : 'info';
     const el = document.createElement('div');
     el.className = `toast toast--${kind}`;
     el.innerHTML = `
-        <span class="toastIcon">${TOAST_ICONS[kind]}</span>
+        <span class="toastIcon">${icon(TOAST[kind].icon)}</span>
         <div class="toastBody">
-            <div class="toastTitle">${esc(title || TOAST_TITLES[kind])}</div>
+            <div class="toastTitle">${esc(title || TOAST[kind].title)}</div>
             <div class="toastMsg">${esc(message || '')}</div>
         </div>
-        <button class="toastClose" type="button" aria-label="Cerrar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-        </button>`;
+        <button class="toastClose" type="button" aria-label="Cerrar">${icon('x')}</button>`;
     const remove = () => {
-        if (!el.parentNode) return;
+        if (!el.parentNode || el.classList.contains('leaving')) return;
         el.classList.add('leaving');
-        setTimeout(() => el.remove(), 230);
+        setTimeout(() => el.remove(), 220);
     };
     el.querySelector('.toastClose').addEventListener('click', remove);
     container.appendChild(el);
@@ -107,27 +158,16 @@ function toast(type, message, title) {
 
 /* ================================================================ API ===== */
 
-function showError(id, msg) {
-    const el = $(id);
-    if (el) el.textContent = msg || '';
-}
-
-function getHeaders() {
-    const h = { 'Content-Type': 'application/json' };
-    if (state.user && state.user.id) h['X-User-Id'] = state.user.id;
-    return h;
-}
-
 async function apiFetch(path, options = {}) {
-    const res = await fetch(API_BASE + path, {
-        ...options,
-        headers: { ...getHeaders(), ...(options.headers || {}) }
-    });
+    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    if (state.user && state.user.id) headers['X-User-Id'] = state.user.id;
+    const res = await fetch(API_BASE + path, { ...options, headers });
     if (res.status === 204) return null;
     const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
     if (!res.ok) {
-        const err = new Error((data && (data.detail || data.title)) || 'Error de conexión');
+        const err = new Error((data && (data.detail || data.title)) || 'Error de conexión con el servidor');
         err.title = data && data.title;
         err.status = res.status;
         throw err;
@@ -135,37 +175,402 @@ async function apiFetch(path, options = {}) {
     return data;
 }
 
+/* ============================================================== sonido ==== */
+
+/** Sonidos sintetizados con WebAudio: nada de ficheros externos. */
+const Sound = {
+    ctx: null,
+
+    ensure() {
+        if (!this.ctx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            this.ctx = new AC();
+        }
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        return this.ctx;
+    },
+
+    /** "Clac" de piedra sobre madera: ruido filtrado + un golpe grave. */
+    stone(delay = 0, volume = 1) {
+        if (!prefs.sound) return;
+        const ctx = this.ensure();
+        if (!ctx) return;
+        const t = ctx.currentTime + delay;
+        const len = 0.09;
+        const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * len), ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 7);
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const band = ctx.createBiquadFilter();
+        band.type = 'bandpass';
+        band.frequency.value = 2100;
+        band.Q.value = 0.8;
+        const g1 = ctx.createGain();
+        g1.gain.setValueAtTime(0.85 * volume, t);
+        g1.gain.exponentialRampToValueAtTime(0.001, t + len);
+        noise.connect(band).connect(g1).connect(ctx.destination);
+        noise.start(t);
+
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(260, t);
+        osc.frequency.exponentialRampToValueAtTime(85, t + 0.08);
+        const g2 = ctx.createGain();
+        g2.gain.setValueAtTime(0.32 * volume, t);
+        g2.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+        osc.connect(g2).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.13);
+    },
+
+    /** Captura: la piedra y, después, las prisioneras cayendo en la tapa. */
+    capture(count) {
+        this.stone();
+        for (let i = 0; i < Math.min(count, 5); i++) this.stone(0.12 + i * 0.055, 0.4);
+    },
+
+    /** Campanita para momentos importantes (rival encontrado, fin de partida). */
+    chime(up = true) {
+        if (!prefs.sound) return;
+        const ctx = this.ensure();
+        if (!ctx) return;
+        const notes = up ? [523.25, 783.99] : [659.25, 440];
+        notes.forEach((f, i) => {
+            const t = ctx.currentTime + i * 0.14;
+            const osc = ctx.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.value = f;
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+            osc.connect(g).connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.55);
+        });
+    }
+};
+
+document.addEventListener('pointerdown', () => { if (prefs.sound) Sound.ensure(); }, { once: true });
+
+/* ============================================================== tablero === */
+
+/** Dibujo del goban: madera de kaya procedural, piedras de pizarra y concha. */
+const Board = (() => {
+    const COLS = 'ABCDEFGHJKLMNOPQRST';
+    const woodCache = new Map();
+
+    /** Generador pseudoaleatorio con semilla: la veta es siempre la misma. */
+    function rng(seed) {
+        let s = seed >>> 0;
+        return () => {
+            s = (s + 0x6D2B79F5) >>> 0;
+            let t = s;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    function wood(px) {
+        const key = Math.round(px);
+        if (woodCache.has(key)) return woodCache.get(key);
+        const c = document.createElement('canvas');
+        c.width = c.height = key;
+        const g = c.getContext('2d');
+        const rand = rng(1982);
+
+        const base = g.createLinearGradient(0, 0, key, key * 0.35);
+        base.addColorStop(0, '#e6bf7c');
+        base.addColorStop(0.5, '#dcae66');
+        base.addColorStop(1, '#d4a25a');
+        g.fillStyle = base;
+        g.fillRect(0, 0, key, key);
+
+        // vetas: líneas onduladas casi horizontales de grosor y tono variables
+        const lines = Math.round(key / 3.2);
+        for (let i = 0; i < lines; i++) {
+            const y0 = rand() * key * 1.1 - key * 0.05;
+            const amp = 1.5 + rand() * key * 0.012;
+            const freq = (0.4 + rand() * 1.4) * Math.PI * 2 / key;
+            const phase = rand() * Math.PI * 2;
+            const drift = (rand() - 0.5) * key * 0.06;
+            g.beginPath();
+            for (let x = -4; x <= key + 4; x += 6) {
+                const y = y0 + Math.sin(x * freq + phase) * amp + drift * (x / key);
+                if (x === -4) g.moveTo(x, y); else g.lineTo(x, y);
+            }
+            const dark = rand() < 0.75;
+            g.strokeStyle = dark
+                ? `rgba(122, 72, 24, ${0.035 + rand() * 0.08})`
+                : `rgba(255, 236, 190, ${0.05 + rand() * 0.08})`;
+            g.lineWidth = 0.4 + rand() * (rand() < 0.12 ? 3.2 : 1.4);
+            g.stroke();
+        }
+
+        // viñeta suave y brillo diagonal (barniz)
+        const vig = g.createRadialGradient(key / 2, key / 2, key * 0.25, key / 2, key / 2, key * 0.75);
+        vig.addColorStop(0, 'rgba(0,0,0,0)');
+        vig.addColorStop(1, 'rgba(70,35,5,.18)');
+        g.fillStyle = vig;
+        g.fillRect(0, 0, key, key);
+        const sheen = g.createLinearGradient(0, 0, key, key);
+        sheen.addColorStop(0, 'rgba(255,255,255,.10)');
+        sheen.addColorStop(0.45, 'rgba(255,255,255,0)');
+        g.fillStyle = sheen;
+        g.fillRect(0, 0, key, key);
+
+        woodCache.set(key, c);
+        if (woodCache.size > 6) woodCache.delete(woodCache.keys().next().value);
+        return c;
+    }
+
+    function starPoints(size) {
+        if (size === 19) return [3, 9, 15].flatMap(a => [3, 9, 15].map(b => [a, b]));
+        if (size === 13) return [[3, 3], [3, 9], [9, 3], [9, 9], [6, 6]];
+        if (size === 9) return [[2, 2], [2, 6], [6, 2], [6, 6], [4, 4]];
+        return [];
+    }
+
+    function metrics(px, size, padRatio) {
+        const cell = px / (size - 1 + 2 * padRatio);
+        return { cell, pad: cell * padRatio };
+    }
+
+    /** Coordenadas de juego (x, y desde abajo) a píxeles: la fila 1 queda abajo, como en un goban real. */
+    function toPx(x, y, size, m) {
+        return [m.pad + x * m.cell, m.pad + (size - 1 - y) * m.cell];
+    }
+
+    function stone(ctx, cx, cy, r, color, alpha, seed) {
+        ctx.save();
+        if (alpha != null) ctx.globalAlpha = alpha;
+
+        // sombra proyectada
+        if (alpha == null) {
+            ctx.beginPath();
+            ctx.arc(cx + r * 0.1, cy + r * 0.16, r * 0.98, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(40, 20, 0, .32)';
+            ctx.shadowColor = 'rgba(40, 20, 0, .45)';
+            ctx.shadowBlur = r * 0.35;
+            ctx.fill();
+            ctx.shadowColor = 'transparent';
+        }
+
+        const grad = ctx.createRadialGradient(cx - r * 0.38, cy - r * 0.42, r * 0.05, cx, cy, r * 1.02);
+        if (color === 'B') {
+            grad.addColorStop(0, '#77797d');
+            grad.addColorStop(0.28, '#34363a');
+            grad.addColorStop(1, '#08090b');
+        } else {
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(0.55, '#efebe2');
+            grad.addColorStop(1, '#c3bcae');
+        }
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        if (color === 'W') {
+            // estrías de concha (hamaguri): arcos concéntricos muy suaves
+            ctx.save();
+            ctx.clip();
+            const ang = ((seed * 137) % 360) * Math.PI / 180;
+            const ox = cx + Math.cos(ang) * r * 1.9;
+            const oy = cy + Math.sin(ang) * r * 1.9;
+            ctx.lineWidth = Math.max(0.5, r * 0.035);
+            for (let k = 1; k <= 9; k++) {
+                ctx.beginPath();
+                ctx.arc(ox, oy, r * (0.95 + k * 0.22), 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(150, 138, 112, ${k % 2 ? 0.13 : 0.07})`;
+                ctx.stroke();
+            }
+            ctx.restore();
+            ctx.lineWidth = Math.max(0.6, r * 0.05);
+            ctx.strokeStyle = 'rgba(110, 100, 80, .45)';
+            ctx.beginPath();
+            ctx.arc(cx, cy, r - ctx.lineWidth / 2, 0, Math.PI * 2);
+            ctx.stroke();
+        } else {
+            // brillo especular de la pizarra
+            ctx.beginPath();
+            ctx.ellipse(cx - r * 0.32, cy - r * 0.38, r * 0.34, r * 0.2, -0.6, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, .10)';
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    /**
+     * opts: { px, dpr, size, board, last, ghost, ghostColor, coords, padRatio }
+     * board: objeto { "x,y": "B" | "W" } tal y como lo guarda el backend.
+     */
+    function draw(ctx, opts) {
+        const { px, dpr = 1, size, board = {}, last = null, ghost = null, ghostColor = 'B', coords = true } = opts;
+        const padRatio = opts.padRatio != null ? opts.padRatio : (coords ? 1.05 : 0.7);
+        const m = metrics(px, size, padRatio);
+        const end = m.pad + (size - 1) * m.cell;
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, px, px);
+        ctx.drawImage(wood(px * dpr), 0, 0, px, px);
+
+        // líneas
+        ctx.strokeStyle = 'rgba(46, 26, 8, .82)';
+        ctx.lineWidth = Math.max(0.8, m.cell * 0.034);
+        ctx.beginPath();
+        for (let i = 0; i < size; i++) {
+            const p = Math.round(m.pad + i * m.cell) + 0.5;
+            ctx.moveTo(m.pad, p); ctx.lineTo(end, p);
+            ctx.moveTo(p, m.pad); ctx.lineTo(p, end);
+        }
+        ctx.stroke();
+        ctx.lineWidth = Math.max(1.4, m.cell * 0.07);
+        ctx.strokeRect(m.pad, m.pad, end - m.pad, end - m.pad);
+
+        // hoshi
+        ctx.fillStyle = 'rgba(46, 26, 8, .9)';
+        for (const [sx, sy] of starPoints(size)) {
+            const [hx, hy] = toPx(sx, sy, size, m);
+            ctx.beginPath();
+            ctx.arc(hx, hy, Math.max(2.2, m.cell * 0.1), 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // coordenadas A–T (sin I) y 1–N, con la fila 1 abajo
+        if (coords) {
+            ctx.fillStyle = 'rgba(70, 40, 12, .78)';
+            ctx.font = `600 ${Math.max(8, Math.round(m.cell * 0.32))}px "Noto Sans", system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const off = m.pad * 0.5;
+            for (let i = 0; i < size; i++) {
+                const p = m.pad + i * m.cell;
+                ctx.fillText(COLS[i], p, off);
+                ctx.fillText(COLS[i], p, px - off);
+                const row = String(size - i);
+                ctx.fillText(row, off, p);
+                ctx.fillText(row, px - off, p);
+            }
+        }
+
+        const r = m.cell * 0.47;
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                const c = board[x + ',' + y];
+                if (c !== 'B' && c !== 'W') continue;
+                const [cx, cy] = toPx(x, y, size, m);
+                stone(ctx, cx, cy, r, c, null, x * 31 + y * 17);
+            }
+        }
+
+        // marca de la última jugada: anillo rojo sello
+        if (last && board[last.x + ',' + last.y]) {
+            const [cx, cy] = toPx(last.x, last.y, size, m);
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 0.42, 0, Math.PI * 2);
+            ctx.lineWidth = Math.max(1.5, r * 0.15);
+            ctx.strokeStyle = '#d0473b';
+            ctx.stroke();
+        }
+
+        if (ghost && !board[ghost.x + ',' + ghost.y]) {
+            const [cx, cy] = toPx(ghost.x, ghost.y, size, m);
+            stone(ctx, cx, cy, r, ghostColor, 0.5, 0);
+        }
+    }
+
+    /** Intersección más cercana a un punto de la pantalla (o null si cae fuera). */
+    function pick(canvas, px, size, clientX, clientY, padRatio = 1.05) {
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width) return null;
+        const lx = (clientX - rect.left) * (px / rect.width);
+        const ly = (clientY - rect.top) * (px / rect.height);
+        const m = metrics(px, size, padRatio);
+        const ix = Math.round((lx - m.pad) / m.cell);
+        const iy = Math.round((ly - m.pad) / m.cell);
+        if (ix < 0 || iy < 0 || ix >= size || iy >= size) return null;
+        if (Math.hypot(m.pad + ix * m.cell - lx, m.pad + iy * m.cell - ly) > m.cell * 0.62) return null;
+        return { x: ix, y: size - 1 - iy };
+    }
+
+    /** "D4" -> {x: 3, y: 3} (inverso de GoRules.formatCoordinate en el backend). */
+    function parseCoord(label) {
+        if (!label || label === '-' || label.length < 2) return null;
+        const x = COLS.indexOf(label[0].toUpperCase());
+        const y = parseInt(label.slice(1), 10) - 1;
+        if (x < 0 || isNaN(y) || y < 0) return null;
+        return { x, y };
+    }
+
+    return { draw, pick, parseCoord };
+})();
+
+/* ======================================================= tema y sonido === */
+
+function applyTheme() {
+    document.documentElement.dataset.theme = prefs.theme;
+    document.querySelector('meta[name="theme-color"]').content = prefs.theme === 'light' ? '#f1ede5' : '#161512';
+    $('themeToggle').innerHTML = icon(prefs.theme === 'light' ? 'moon' : 'sun');
+    $('themeToggle').title = prefs.theme === 'light' ? 'Tema oscuro' : 'Tema claro';
+}
+
+function applySound() {
+    $('soundToggle').innerHTML = icon(prefs.sound ? 'sound' : 'mute');
+    $('soundToggle').title = prefs.sound ? 'Silenciar' : 'Activar sonido';
+}
+
+$('themeToggle').addEventListener('click', () => {
+    prefs.theme = prefs.theme === 'light' ? 'dark' : 'light';
+    store.set('gousc_theme', prefs.theme);
+    applyTheme();
+});
+
+$('soundToggle').addEventListener('click', () => {
+    prefs.sound = !prefs.sound;
+    store.set('gousc_sound', prefs.sound ? 'on' : 'off');
+    applySound();
+    if (prefs.sound) Sound.stone();
+});
+
 /* ============================================================== sesión ==== */
 
 function saveUser() {
-    if (state.user) localStorage.setItem('gousc_user', JSON.stringify(state.user));
+    if (state.user) store.set('gousc_user', JSON.stringify(state.user));
 }
 
 function syncUserUI() {
     if (!state.user) return;
     $('currentUser').textContent = state.user.username || '-';
     $('currentElo').textContent = state.user.elo != null ? state.user.elo : 1500;
-    $('headerAvatar').textContent = initials(state.user.username);
+    setAvatar($('headerAvatar'), state.user.username);
+    renderSideMe();
 }
 
 function setAuth(user) {
     state.user = user;
     if (user) {
         saveUser();
+        $('loginSection').hidden = true;
+        $('mainSection').hidden = false;
         syncUserUI();
-        views.loginSection.style.display = 'none';
-        views.mainSection.style.display = 'flex';
-        views.gameSection.style.display = 'none';
-        loadGames();
-        loadFriends();
+        switchView('lobbyView');
         loadRanking();
-        loadChatUsers();
+        loadFriends();
         refreshMe();
     } else {
-        localStorage.removeItem('gousc_user');
-        views.loginSection.style.display = 'flex';
-        views.mainSection.style.display = 'none';
-        views.gameSection.style.display = 'none';
+        store.del('gousc_user');
+        state.gameId = null;
+        state.game = null;
+        $('mainSection').hidden = true;
+        $('loginSection').hidden = false;
+        document.title = BASE_TITLE;
+        drawHero();
     }
 }
 
@@ -177,80 +582,55 @@ async function refreshMe() {
             state.user = { ...state.user, ...me };
             saveUser();
             syncUserUI();
-            renderProfile();
+            if (state.view === 'profileView') renderProfile();
         }
-    } catch (e) { /* sin conexión: se mantiene la copia local */ }
+    } catch (e) {
+        if (e.status === 404) {
+            toast('warning', 'Tu cuenta ya no existe en el servidor. Vuelve a entrar.', 'Sesión caducada');
+            setAuth(null);
+        }
+    }
 }
 
-/* ========================================================= pestañas/nav === */
+/* ============================================================ acceso ===== */
 
-const tabs = document.querySelectorAll('.tab');
-const tabContents = document.querySelectorAll('.tabContent');
-tabs.forEach(t => {
-    t.addEventListener('click', () => {
-        tabs.forEach(x => x.classList.remove('active'));
-        tabContents.forEach(x => x.classList.remove('active'));
-        t.classList.add('active');
-        $(t.dataset.tab).classList.add('active');
+document.querySelectorAll('.segBtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.segBtn').forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.tabPane').forEach(p => p.classList.toggle('active', p.id === btn.dataset.tab));
     });
 });
 
-const navBtns = document.querySelectorAll('.navBtn');
-const viewsEl = document.querySelectorAll('.view');
-
-function switchView(viewId) {
-    navBtns.forEach(x => x.classList.toggle('active', x.dataset.view === viewId));
-    viewsEl.forEach(x => x.classList.toggle('active', x.id === viewId));
-    if (viewId === 'rankingView') loadRanking();
-    if (viewId === 'friendsView') loadFriends();
-    if (viewId === 'chatView') { loadChatUsers().then(() => loadPrivateChat(false)); }
-    if (viewId === 'lobbyView') loadGames(true);
-    if (viewId === 'profileView') loadProfile();
-}
-
-navBtns.forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
-$('userChip').addEventListener('click', () => switchView('profileView'));
-
-/* =============================================================== auth ===== */
-
 $('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    showError('loginError', '');
+    $('loginError').textContent = '';
     const username = $('loginUsername').value.trim();
-    const password = $('loginPassword').value.trim();
-    if (!username || !password) { showError('loginError', 'Rellena todos los campos'); return; }
+    const password = $('loginPassword').value;
+    if (!username || !password) { $('loginError').textContent = 'Rellena usuario y contraseña.'; return; }
     try {
-        const user = await apiFetch('/users/login', {
-            method: 'POST',
-            body: JSON.stringify({ username, password })
-        });
+        const user = await apiFetch('/users/login', { method: 'POST', body: JSON.stringify({ username, password }) });
         setAuth(user);
-        toast('success', `Bienvenido de nuevo, ${user.username}.`, 'Sesión iniciada');
+        toast('success', `Bienvenido, ${user.username}. ¡Buenas partidas!`, 'Sesión iniciada');
     } catch (err) {
-        showError('loginError', err.message);
-        toast('error', err.message, err.title || 'No se pudo iniciar sesión');
+        $('loginError').textContent = err.message;
     }
 });
 
 $('registerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    showError('regError', '');
+    $('regError').textContent = '';
     const username = $('regUsername').value.trim();
-    const password = $('regPassword').value.trim();
+    const password = $('regPassword').value;
     const email = $('regEmail').value.trim();
-    if (!username || !password) { showError('regError', 'Usuario y contraseña obligatorios'); return; }
+    if (username.length < 3) { $('regError').textContent = 'El usuario necesita al menos 3 caracteres.'; return; }
+    if (password.length < 3) { $('regError').textContent = 'La contraseña necesita al menos 3 caracteres.'; return; }
     try {
-        await apiFetch('/users', {
-            method: 'POST',
-            body: JSON.stringify({ username, password, email: email || null })
-        });
-        toast('success', 'Cuenta creada. Ya puedes iniciar sesión.', 'Registro completado');
-        $('loginUsername').value = username;
-        $('loginPassword').value = '';
-        document.querySelector('.tab[data-tab="loginTab"]').click();
+        await apiFetch('/users', { method: 'POST', body: JSON.stringify({ username, password, email: email || null }) });
+        const user = await apiFetch('/users/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+        setAuth(user);
+        toast('success', 'Tu cuenta está lista. Empieza con una partida rápida.', `¡Hola, ${user.username}!`);
     } catch (err) {
-        showError('regError', err.message);
-        toast('error', err.message, err.title || 'No se pudo registrar');
+        $('regError').textContent = err.message;
     }
 });
 
@@ -259,37 +639,67 @@ $('logoutBtn').addEventListener('click', () => {
     toast('info', 'Has cerrado la sesión.', 'Hasta pronto');
 });
 
-/* =============================================================== lobby ==== */
+/* ========================================================= navegación ===== */
+
+function switchView(viewId) {
+    const leavingGame = state.view === 'gameView' && viewId !== 'gameView';
+    state.view = viewId;
+    document.querySelectorAll('.navBtn').forEach(b => b.classList.toggle('active', b.dataset.view === viewId));
+    $('userChip').classList.toggle('active', viewId === 'profileView');
+    document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === viewId));
+
+    if (leavingGame) {
+        state.gameId = null;
+        state.game = null;
+        document.title = BASE_TITLE;
+    }
+    if (viewId !== 'gameView') window.scrollTo({ top: 0 });
+
+    if (viewId === 'lobbyView') { loadGames(true); loadRanking(); renderProverb(); }
+    if (viewId === 'rankingView') loadRanking(true);
+    if (viewId === 'friendsView') loadFriends(true);
+    if (viewId === 'chatView') openChatView();
+    if (viewId === 'profileView') loadProfile();
+}
+
+document.querySelectorAll('.navBtn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => switchView(b.dataset.goto)));
+$('userChip').addEventListener('click', () => switchView('profileView'));
+$('brandHome').addEventListener('click', () => switchView('lobbyView'));
+
+/* ============================================================== lobby ===== */
 
 const inflight = {};
 let lastGamesJson = '';
 
-$('createGameBtn').addEventListener('click', async () => {
-    if (!state.user) return;
-    const boardSize = $('boardSizeSelect').value;
-    const mode = $('gameModeSelect').value;
+$('poolGrid').addEventListener('click', async (e) => {
+    const pool = e.target.closest('.pool');
+    if (!pool || !state.user) return;
+    const pools = document.querySelectorAll('.pool');
+    pools.forEach(p => { p.disabled = true; });
     try {
         const game = await apiFetch('/games', {
             method: 'POST',
-            body: JSON.stringify({ boardSize, mode })
+            body: JSON.stringify({ boardSize: pool.dataset.size, mode: pool.dataset.mode })
         });
-        toast('success', `Partida #${game.id} creada.`, 'Partida lista');
-        await loadGames(true);
-        if (game && game.id) await openGame(game.id);
+        Sound.stone();
+        await openGame(game.id);
     } catch (err) {
         toast('error', err.message, err.title || 'No se pudo crear la partida');
+    } finally {
+        pools.forEach(p => { p.disabled = false; });
     }
 });
 
-$('refreshLobbyBtn').addEventListener('click', () => loadGames(true));
-
-$('backToLobbyBtn').addEventListener('click', () => {
-    state.currentGameId = null;
-    state.currentGame = null;
-    views.gameSection.style.display = 'none';
-    views.mainSection.style.display = 'flex';
-    loadGames(true);
+$('lobbyTabs').addEventListener('click', (e) => {
+    const tab = e.target.closest('.lineTab');
+    if (!tab) return;
+    state.lobbyFilter = tab.dataset.filter;
+    document.querySelectorAll('#lobbyTabs .lineTab').forEach(t => t.classList.toggle('active', t === tab));
+    renderGames();
 });
+
+$('refreshLobbyBtn').addEventListener('click', () => loadGames(true));
 
 async function loadGames(force) {
     if (inflight.games) return;
@@ -306,49 +716,69 @@ async function loadGames(force) {
     finally { inflight.games = false; }
 }
 
-const STATUS_MAP = {
-    WAITING: { cls: 'chip--wait', text: 'Esperando' },
-    ACTIVE: { cls: 'chip--live', text: 'En juego' },
-    FINISHED: { cls: 'chip--done', text: 'Finalizada' },
-    ABANDONED: { cls: 'chip--off', text: 'Abandonada' }
+const LOBBY_FILTERS = {
+    open: g => g.status === 'WAITING',
+    live: g => g.status === 'ACTIVE',
+    done: g => g.status === 'FINISHED' || g.status === 'ABANDONED'
 };
 
-function statusChip(status) {
-    const s = STATUS_MAP[status] || { cls: '', text: status || '-' };
-    return `<span class="chip ${s.cls}">${esc(s.text)}</span>`;
+function isMineGame(g) {
+    const me = state.user && state.user.id;
+    return me != null && ((g.blackPlayer && g.blackPlayer.id === me) || (g.whitePlayer && g.whitePlayer.id === me));
 }
 
-function playerNames(g) {
-    const black = g.blackPlayer ? g.blackPlayer.username : '—';
-    const white = g.whitePlayer ? g.whitePlayer.username : 'Por jugar';
-    return `<strong>${esc(black)}</strong><span class="vsTag">VS</span><strong>${esc(white)}</strong>`;
+function playerLine(p, color, fallback) {
+    const stoneCls = color === 'B' ? 'stone--b' : 'stone--w';
+    if (!p) return `<span class="grName"><span class="stone ${stoneCls}"></span><small>${esc(fallback)}</small></span>`;
+    return `<span class="grName"><span class="stone ${stoneCls}"></span>${esc(p.username)} <small>${esc(p.elo != null ? p.elo : 1500)}</small></span>`;
 }
 
 function renderGames() {
-    const list = $('gamesList');
-    if (!state.games.length) {
-        list.innerHTML = emptyState('No hay partidas abiertas', 'Crea una nueva desde el panel superior.');
+    $('countOpen').textContent = state.games.filter(LOBBY_FILTERS.open).length;
+    $('countLive').textContent = state.games.filter(LOBBY_FILTERS.live).length;
+    $('countDone').textContent = state.games.filter(LOBBY_FILTERS.done).length;
+
+    let list = state.games.filter(LOBBY_FILTERS[state.lobbyFilter]);
+    if (state.lobbyFilter === 'done') list = list.slice(0, 30);
+    // mis partidas primero
+    list = [...list.filter(isMineGame), ...list.filter(g => !isMineGame(g))];
+
+    const box = $('gamesList');
+    if (!list.length) {
+        const msg = {
+            open: ['No hay salas abiertas', 'Crea una con los botones de partida rápida y espera rival.'],
+            live: ['Nadie está jugando ahora mismo', 'Sé el primero: crea una partida.'],
+            done: ['Todavía no ha terminado ninguna partida', '']
+        }[state.lobbyFilter];
+        box.innerHTML = emptyState(msg[0], msg[1]);
         return;
     }
-    list.innerHTML = state.games.map(g => {
-        const canJoin = g.status === 'WAITING' && state.user && g.blackPlayer
-            && g.blackPlayer.id !== state.user.id && !g.whitePlayer;
-        return `<div class="gameCard">
-            <div class="gameCardInfo">
-                <div class="gameCardTop">
-                    <span class="gameCardId">Partida #${esc(g.id)}</span>
-                    ${statusChip(g.status)}
-                    <span class="chip ${g.mode === 'RANKED' ? 'chip--ranked' : ''}">${esc(g.mode)}</span>
-                    <span class="chip">${esc(g.boardSize)}</span>
+
+    const me = state.user && state.user.id;
+    box.innerHTML = `
+        <div class="gameRow gameRowHead"><span>Jugadores</span><span>Tablero</span><span>Modo</span><span>Estado</span><span></span></div>
+        ${list.map(g => {
+            const mine = isMineGame(g);
+            const canJoin = g.status === 'WAITING' && !mine && g.blackPlayer && g.blackPlayer.id !== me;
+            let action;
+            if (canJoin) action = `<button class="btn btnPrimary btnSm" data-action="join" data-id="${esc(g.id)}" type="button">${icon('play')}Unirse</button>`;
+            else if (mine && (g.status === 'WAITING' || g.status === 'ACTIVE')) action = `<button class="btn btnGood btnSm" data-action="view" data-id="${esc(g.id)}" type="button">Continuar</button>`;
+            else action = `<button class="btn btnGhost btnSm" data-action="view" data-id="${esc(g.id)}" type="button">${icon('eye')}Ver</button>`;
+            const owner = g.blackPlayer ? g.blackPlayer.username : '?';
+            return `<div class="gameRow${mine ? ' isMine' : ''}">
+                <div class="grPlayers">
+                    ${avatar(owner, 'avatarSm')}
+                    <div class="grNames">
+                        ${playerLine(g.blackPlayer, 'B', '—')}
+                        ${playerLine(g.whitePlayer, 'W', 'esperando rival…')}
+                    </div>
                 </div>
-                <div class="gamePlayers">${playerNames(g)}</div>
-            </div>
-            <div class="gameCardActions">
-                <button class="btn btnGhost btnSm" data-action="view" data-id="${esc(g.id)}" type="button">Ver</button>
-                ${canJoin ? `<button class="btn btnPrimary btnSm" data-action="join" data-id="${esc(g.id)}" type="button">Unirse</button>` : ''}
-            </div>
-        </div>`;
-    }).join('');
+                <span class="grSize">${esc(SIZE_LABEL[g.boardSize] || g.boardSize)}</span>
+                <span class="grMode">${modeChip(g.mode)}</span>
+                <span class="grState">${statusChip(g.status)} <span class="grId">#${esc(g.id)}</span></span>
+                <div class="grActions">${action}</div>
+            </div>`;
+        }).join('')}`;
 }
 
 $('gamesList').addEventListener('click', async (e) => {
@@ -356,16 +786,81 @@ $('gamesList').addEventListener('click', async (e) => {
     if (!btn) return;
     const id = btn.dataset.id;
     if (btn.dataset.action === 'view') return openGame(id);
-    if (btn.dataset.action === 'join') {
-        try {
-            await apiFetch(`/games/${id}/join`, { method: 'POST' });
-            toast('success', `Te has unido a la partida #${id}.`, 'Partida encontrada');
-            await openGame(id);
-        } catch (err) { toast('error', err.message, err.title || 'No te pudiste unir'); }
-    }
+    await joinGame(id);
 });
 
-/* ============================================================= ranking ==== */
+async function joinGame(id) {
+    try {
+        await apiFetch(`/games/${id}/join`, { method: 'POST' });
+        Sound.chime(true);
+        toast('success', `Juegas con blancas en la partida #${id}. ¡Suerte!`, 'Te has unido');
+        await openGame(id);
+    } catch (err) {
+        toast('error', err.message, err.title || 'No te pudiste unir');
+        loadGames(true);
+    }
+}
+
+/* ------------------------------------------------- columna lateral ----- */
+
+function renderSideMe() {
+    const u = state.user;
+    const box = $('sideMe');
+    if (!u || !box) return;
+    const pos = state.ranking.findIndex(r => r.id === u.id);
+    const total = (u.wins || 0) + (u.losses || 0);
+    box.innerHTML = `
+        <div class="meTop">
+            ${avatar(u.username, 'avatarLg')}
+            <div>
+                <div class="meName">${esc(u.username)}</div>
+                <div class="meSub">ID #${esc(u.id)}${pos >= 0 ? ` · ${pos + 1}º del ranking` : ''}</div>
+            </div>
+        </div>
+        <div class="meStats">
+            <div class="meStat"><b>${esc(u.elo != null ? u.elo : 1500)}</b><span>ELO</span></div>
+            <div class="meStat"><b class="good">${esc(u.wins || 0)}</b><span>Vict.</span></div>
+            <div class="meStat"><b class="bad">${esc(u.losses || 0)}</b><span>Derr.</span></div>
+        </div>
+        ${total === 0 ? '<p class="muted small" style="margin:0">Aún no tienes partidas Ranked. ¿Una 9×9 para calentar?</p>' : ''}`;
+}
+
+function renderSideTop() {
+    const me = state.user && state.user.id;
+    const top = state.ranking.slice(0, 5);
+    $('sideTop').innerHTML = top.length
+        ? top.map((u, i) => `<li class="${u.id === me ? 'isMe' : ''}">
+                <span class="miniPos">${i + 1}</span>
+                ${avatar(u.username, 'avatarXs')}
+                <span class="miniName">${esc(u.username)}</span>
+                <span class="miniElo">${esc(u.elo)}</span>
+            </li>`).join('')
+        : `<li class="muted small">Sin jugadores todavía</li>`;
+}
+
+const PROVERBS = [
+    'Juega lejos de tu propio grosor.',
+    'El punto clave de tu rival es también tu punto clave.',
+    'Los grandes dragones nunca mueren.',
+    'Hay muerte en el hane.',
+    'Pierde tus primeras cincuenta partidas lo más rápido posible.',
+    'Los principiantes juegan atari.',
+    'Haz hane en la cabeza de dos piedras.',
+    'El triángulo vacío es malo.',
+    'No vayas de pesca mientras tu casa está en llamas.',
+    'Primero las esquinas, después los lados y al final el centro.',
+    'Ataca la cintura del salto de caballo.',
+    'No intentes cortar el salto de un punto.',
+    'Sacrifica piedras para ganar la iniciativa.',
+    'Un grupo con dos ojos vive.'
+];
+
+function renderProverb() {
+    const day = Math.floor(Date.now() / 86400000);
+    $('proverbText').textContent = '«' + PROVERBS[day % PROVERBS.length] + '»';
+}
+
+/* ============================================================ ranking ===== */
 
 let lastRankingJson = '';
 
@@ -379,51 +874,63 @@ async function loadRanking(force) {
         if (force || json !== lastRankingJson) {
             lastRankingJson = json;
             renderRanking();
+            renderSideTop();
+            renderSideMe();
         }
     } catch (err) { console.error(err); }
     finally { inflight.ranking = false; }
 }
 
 function renderRanking() {
+    const me = state.user && state.user.id;
+    const top = state.ranking.slice(0, 3);
+    $('podium').innerHTML = top.map((u, i) => `
+        <div class="podiumCard p${i + 1}${u.id === me ? ' isMe' : ''}">
+            <span class="podiumPos">${i + 1}</span>
+            ${avatar(u.username, i === 0 ? 'avatarXl' : 'avatarLg')}
+            <span class="podiumName">${esc(u.username)}</span>
+            <span class="podiumElo">${esc(u.elo)}</span>
+            <span class="podiumWl">${esc(u.wins || 0)} V · ${esc(u.losses || 0)} D</span>
+        </div>`).join('');
+
     const body = $('rankingBody');
     if (!state.ranking.length) {
-        body.innerHTML = `<tr><td colspan="5">${emptyState('Aún no hay jugadores en el ranking')}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="6">${emptyState('Aún no hay jugadores en el ranking')}</td></tr>`;
         return;
     }
-    const meId = state.user && state.user.id;
     body.innerHTML = state.ranking.map((u, i) => {
-        const isMe = meId != null && u.id === meId;
-        return `<tr class="${isMe ? 'isMe' : ''}">
-            <td class="colRank"><span class="rankBadge${i < 3 ? ` rankBadge--${i + 1}` : ''}">${i + 1}</span></td>
-            <td>
-                <div class="playerCell">
-                    <span class="avatar avatarXs">${esc(initials(u.username))}</span>
-                    <span class="playerCellName">${esc(u.username)}${isMe ? '<small>Tú</small>' : ''}</span>
-                </div>
-            </td>
-            <td class="colElo"><span class="eloPill">${u.elo != null ? u.elo : 1500}</span></td>
-            <td class="colNum"><span class="wPill">${u.wins || 0}</span></td>
-            <td class="colNum"><span class="lPill">${u.losses || 0}</span></td>
+        const total = (u.wins || 0) + (u.losses || 0);
+        const pct = total ? Math.round((u.wins || 0) * 100 / total) : null;
+        return `<tr class="${u.id === me ? 'isMe' : ''}">
+            <td class="colRank"><span class="rankPos${i < 3 ? ' top' : ''}">${i + 1}</span></td>
+            <td><div class="playerCell">${avatar(u.username, 'avatarXs')}${esc(u.username)}${u.id === me ? '<span class="youTag">TÚ</span>' : ''}</div></td>
+            <td class="colNum eloCell">${esc(u.elo)}</td>
+            <td class="colNum ${u.wins ? 'good' : 'muted'}">${esc(u.wins || 0)}</td>
+            <td class="colNum ${u.losses ? 'bad' : 'muted'}">${esc(u.losses || 0)}</td>
+            <td class="colNum colHide">${pct == null ? '<span class="muted">—</span>' : `<span class="bar"><i style="width:${pct}%"></i></span>${pct}%`}</td>
         </tr>`;
     }).join('');
 }
 
-/* ============================================================== amigos ==== */
+/* ============================================================= amigos ===== */
 
 let lastFriendsJson = '';
 
-async function loadFriends() {
+async function loadFriends(force) {
     if (inflight.friends) return;
     inflight.friends = true;
     try {
-        const friends = await apiFetch('/friendships');
-        const pending = await apiFetch('/friendships/pending');
+        const [friends, pending] = await Promise.all([apiFetch('/friendships'), apiFetch('/friendships/pending')]);
         state.friends = friends || [];
         state.pending = pending || [];
+        const badge = $('pendingBadge');
+        badge.textContent = state.pending.length;
+        badge.hidden = state.pending.length === 0;
         const json = JSON.stringify([state.friends, state.pending]);
-        if (json !== lastFriendsJson) {
+        if (force || json !== lastFriendsJson) {
             lastFriendsJson = json;
             renderFriends();
+            if (state.view === 'chatView') renderConversations();
         }
     } catch (err) { console.error(err); }
     finally { inflight.friends = false; }
@@ -433,233 +940,186 @@ function renderFriends() {
     $('pendingCount').textContent = state.pending.length;
     $('friendsCount').textContent = state.friends.length;
 
-    const pList = $('pendingList');
-    pList.innerHTML = state.pending.length ? state.pending.map(p => `
+    $('pendingList').innerHTML = state.pending.length ? state.pending.map(p => `
         <div class="itemRow">
-            <span class="avatar avatarSm">${esc(initials(p.requester && p.requester.username))}</span>
+            ${avatar(p.requester && p.requester.username)}
             <div class="itemInfo">
                 <span class="itemName">${esc(p.requester ? p.requester.username : 'Desconocido')}</span>
-                <span class="itemMeta">Solicitud #${esc(p.id)} · ${esc(fmtDate(p.createdAt))}</span>
+                <span class="itemMeta">ELO ${esc(p.requester ? p.requester.elo : '-')} · ${esc(fmtAgo(p.createdAt))}</span>
             </div>
             <div class="itemActions">
-                <button class="btn btnPrimary btnSm" data-action="accept" data-id="${esc(p.id)}" type="button">Aceptar</button>
-                <button class="btn btnGhost btnSm" data-action="reject" data-id="${esc(p.id)}" type="button">Rechazar</button>
+                <button class="iconBtn iconBtnSm iconBtnAccent" data-action="accept" data-id="${esc(p.id)}" type="button" title="Aceptar">${icon('check')}</button>
+                <button class="iconBtn iconBtnSm" data-action="reject" data-id="${esc(p.id)}" type="button" title="Rechazar">${icon('x')}</button>
             </div>
-        </div>`).join('') : emptyState('No tienes solicitudes pendientes', 'Comparte tu ID para que te agreguen.');
+        </div>`).join('') : emptyState('Sin solicitudes pendientes');
 
-    const fList = $('friendsList');
-    fList.innerHTML = state.friends.length ? state.friends.map(f => `
+    $('friendsList').innerHTML = state.friends.length ? state.friends.map(f => `
         <div class="itemRow">
-            <span class="avatar avatarSm">${esc(initials(f.username))}</span>
+            ${avatar(f.username)}
             <div class="itemInfo">
                 <span class="itemName">${esc(f.username)}</span>
-                <span class="itemMeta">ELO ${f.elo != null ? f.elo : 1500} · ID ${esc(f.id)}</span>
+                <span class="itemMeta">ELO ${esc(f.elo != null ? f.elo : 1500)} · ${esc(f.wins || 0)} V / ${esc(f.losses || 0)} D · ID ${esc(f.id)}</span>
             </div>
             <div class="itemActions">
-                <button class="btn btnGhost btnSm" data-action="chat" data-id="${esc(f.id)}" type="button">Chat</button>
+                <button class="btn btnGhost btnSm" data-action="chat" data-id="${esc(f.id)}" type="button">${icon('chat')}Chat</button>
             </div>
-        </div>`).join('') : emptyState('Todavía no tienes amigos', 'Añade jugadores por su ID.');
+        </div>`).join('') : emptyState('Todavía no tienes amigos', 'Añade jugadores por su ID desde el panel de la izquierda.');
 }
 
 $('pendingList').addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
-    const id = btn.dataset.id;
+    const accept = btn.dataset.action === 'accept';
     try {
-        if (btn.dataset.action === 'accept') {
-            await apiFetch(`/friendships/${id}/accept`, { method: 'POST' });
-            toast('success', 'Solicitud aceptada.', 'Amigos');
-            loadFriends();
-            loadChatUsers();
-        } else {
-            await apiFetch(`/friendships/${id}/reject`, { method: 'POST' });
-            toast('info', 'Solicitud rechazada.', 'Amigos');
-            loadFriends();
-        }
+        await apiFetch(`/friendships/${btn.dataset.id}/${accept ? 'accept' : 'reject'}`, { method: 'POST' });
+        toast(accept ? 'success' : 'info', accept ? 'Ya sois amigos.' : 'Solicitud rechazada.', 'Amigos');
+        loadFriends(true);
     } catch (err) { toast('error', err.message, err.title || 'No se pudo procesar'); }
 });
 
 $('friendsList').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-action="chat"]');
     if (!btn) return;
+    state.chatWith = Number(btn.dataset.id);
     switchView('chatView');
-    setTimeout(() => {
-        $('chatUserSelect').value = btn.dataset.id;
-        loadPrivateChat(false);
-    }, 60);
 });
 
-$('addFriendBtn').addEventListener('click', async () => {
-    const id = $('friendIdInput').value.trim();
-    if (!id) { toast('warning', 'Introduce el ID del jugador que quieres agregar.', 'Falta el ID'); return; }
-    if (state.user && String(state.user.id) === id) {
-        toast('warning', 'No puedes enviarte una solicitud a ti mismo.', 'ID inválido');
-        return;
-    }
+$('addFriendForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = $('friendIdInput').value.trim().replace(/^#/, '');
+    if (!/^\d+$/.test(id)) { toast('warning', 'Introduce el ID numérico del jugador.', 'ID no válido'); return; }
+    if (state.user && String(state.user.id) === id) { toast('warning', 'No puedes enviarte una solicitud a ti mismo.', 'ID no válido'); return; }
     try {
-        await apiFetch('/friendships', {
-            method: 'POST',
-            body: JSON.stringify({ addresseeId: parseInt(id, 10) })
-        });
+        await apiFetch('/friendships', { method: 'POST', body: JSON.stringify({ addresseeId: parseInt(id, 10) }) });
         $('friendIdInput').value = '';
         toast('success', `Solicitud enviada al jugador #${id}.`, 'Solicitud enviada');
-        loadFriends();
+        loadFriends(true);
     } catch (err) { toast('error', err.message, err.title || 'No se pudo enviar la solicitud'); }
 });
 
-/* ================================================================ chat ==== */
+/* =============================================================== chat ===== */
 
-async function loadChatUsers() {
-    try {
-        const friends = await apiFetch('/friendships');
-        state.friends = friends || [];
-        const sel = $('chatUserSelect');
-        const previous = sel.value;
-        sel.innerHTML = state.friends.length
-            ? state.friends.map(f => `<option value="${esc(f.id)}">${esc(f.username)}</option>`).join('')
-            : '<option value="">No tienes amigos aún</option>';
-        if (previous && [...sel.options].some(o => o.value === previous)) sel.value = previous;
-        return state.friends;
-    } catch (err) { console.error(err); return []; }
+let lastPrivateKey = '';
+
+async function openChatView() {
+    await loadFriends(true);
+    if (!state.friends.some(f => f.id === state.chatWith)) {
+        state.chatWith = state.friends.length ? state.friends[0].id : null;
+    }
+    renderConversations();
+    loadPrivateChat(true);
 }
 
-$('chatUserSelect').addEventListener('change', () => loadPrivateChat(false));
-$('loadChatBtn').addEventListener('click', () => loadPrivateChat(true));
-$('sendPrivateBtn').addEventListener('click', sendPrivateMsg);
-$('privateMsgInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendPrivateMsg(); });
+function renderConversations() {
+    const box = $('convItems');
+    if (!state.friends.length) {
+        box.innerHTML = emptyState('Sin conversaciones', 'Añade amigos para chatear.');
+    } else {
+        box.innerHTML = state.friends.map(f => `
+            <button class="convItem${f.id === state.chatWith ? ' active' : ''}" data-id="${esc(f.id)}" type="button">
+                ${avatar(f.username)}
+                <span class="itemInfo"><span class="itemName">${esc(f.username)}</span><span class="itemMeta">ELO ${esc(f.elo)}</span></span>
+            </button>`).join('');
+    }
+    const f = state.friends.find(x => x.id === state.chatWith);
+    $('convTop').innerHTML = f
+        ? `${avatar(f.username)}<div class="itemInfo"><span class="convTopName">${esc(f.username)}</span><span class="itemMeta">ELO ${esc(f.elo)} · ID ${esc(f.id)}</span></div>`
+        : '<span class="muted">Elige una conversación</span>';
+    $('privateMsgInput').disabled = !f;
+}
 
-let lastPrivateJson = '';
-let lastPrivateWith = null;
+$('convItems').addEventListener('click', (e) => {
+    const item = e.target.closest('.convItem');
+    if (!item) return;
+    state.chatWith = Number(item.dataset.id);
+    renderConversations();
+    loadPrivateChat(true);
+    $('privateMsgInput').focus();
+});
 
 async function loadPrivateChat(force) {
-    const withId = $('chatUserSelect').value;
+    const withId = state.chatWith;
     const box = $('privateChat');
     if (!withId) {
-        lastPrivateJson = '';
-        lastPrivateWith = null;
-        box.innerHTML = emptyState('Elige una conversación', 'Selecciona un amigo para empezar a chatear.');
+        lastPrivateKey = '';
+        box.innerHTML = emptyState('Elige una conversación', 'Selecciona un amigo para empezar a hablar.');
         return;
     }
     if (inflight.privateChat) return;
     inflight.privateChat = true;
     try {
         const msgs = await apiFetch(`/messages?with=${withId}`);
-        if ($('chatUserSelect').value !== withId) return;
-        state.privateChat = msgs || [];
-        const json = JSON.stringify(state.privateChat);
-        const switched = withId !== lastPrivateWith;
-        if (!force && !switched && json === lastPrivateJson) return;
-        lastPrivateJson = json;
-        lastPrivateWith = withId;
-        renderChatBox(box, state.privateChat, true, !force && !switched);
+        if (state.chatWith !== withId) return;
+        const key = withId + ':' + JSON.stringify(msgs);
+        if (!force && key === lastPrivateKey) return;
+        const sameConversation = lastPrivateKey.startsWith(withId + ':');
+        lastPrivateKey = key;
+        renderChatBox(box, msgs || [], sameConversation && !force, false);
     } catch (err) {
         if (force) toast('error', err.message, err.title || 'No se pudo cargar el chat');
     } finally { inflight.privateChat = false; }
 }
 
-async function sendPrivateMsg() {
-    const withId = $('chatUserSelect').value;
+$('privateChatForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
     const input = $('privateMsgInput');
     const content = input.value.trim();
-    if (!withId) { toast('warning', 'Selecciona primero una conversación.', 'Chat'); return; }
-    if (!content) return;
+    if (!state.chatWith || !content) return;
     try {
-        await apiFetch(`/messages?to=${withId}`, {
-            method: 'POST',
-            body: JSON.stringify({ content })
-        });
+        await apiFetch(`/messages?to=${state.chatWith}`, { method: 'POST', body: JSON.stringify({ content }) });
         input.value = '';
         await loadPrivateChat(true);
     } catch (err) { toast('error', err.message, err.title || 'No se pudo enviar el mensaje'); }
-}
+});
 
-function renderChatBox(box, msgs, mineFlag, keepScroll) {
-    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 70;
+/** Burbujas de chat. Los mensajes seguidos del mismo autor se agrupan. */
+function renderChatBox(box, msgs, keepScroll, showNames) {
+    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
     if (!msgs.length) {
-        box.innerHTML = emptyState('Sin mensajes todavía', '¡Saluda para empezar la conversación!');
-        box.scrollTop = box.scrollHeight;
+        box.innerHTML = emptyState('Sin mensajes todavía', '¡Saluda para romper el hielo!');
         return;
     }
-    const meId = state.user && state.user.id;
-    box.innerHTML = msgs.map(m => {
-        const mine = mineFlag && meId != null && m.sender && m.sender.id === meId;
-        const sender = m.sender ? m.sender.username : '';
-        return `<div class="chatMsg${mine ? ' mine' : ''}">
-            <span class="sender">${esc(mine ? 'Tú' : sender)}</span>
-            <span class="msgText">${esc(m.content)}</span>
-            <span class="msgTime">${esc(fmtTime(m.createdAt))}</span>
+    const me = state.user && state.user.id;
+    box.innerHTML = msgs.map((m, i) => {
+        const mine = me != null && m.sender && m.sender.id === me;
+        const next = msgs[i + 1];
+        const cont = next && next.sender && m.sender && next.sender.id === m.sender.id;
+        const who = mine ? '' : (showNames && m.sender ? esc(m.sender.username) + ' · ' : '');
+        return `<div class="chatMsg${mine ? ' mine' : ''}${cont ? ' cont' : ''}">
+            <span class="bubble">${esc(m.content)}</span>
+            <span class="msgMeta">${who}${esc(fmtTime(m.createdAt))}</span>
         </div>`;
     }).join('');
     if (!keepScroll || nearBottom) box.scrollTop = box.scrollHeight;
 }
 
-/* ====================================================== chat de partida === */
-
-$('sendGameMsgBtn').addEventListener('click', sendGameMsg);
-$('gameMsgInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendGameMsg(); });
-
-let lastGameChatJson = '';
-
-async function loadGameChat(force) {
-    if (!state.currentGameId) return;
-    if (inflight.gameChat) return;
-    inflight.gameChat = true;
-    try {
-        const msgs = await apiFetch(`/games/${state.currentGameId}/messages`);
-        state.gameChat = msgs || [];
-        const json = JSON.stringify(state.gameChat);
-        if (!force && json === lastGameChatJson) return;
-        lastGameChatJson = json;
-        renderChatBox($('gameChatBox'), state.gameChat, true, !force);
-    } catch (err) { console.error(err); }
-    finally { inflight.gameChat = false; }
-}
-
-async function sendGameMsg() {
-    if (!state.currentGameId) return;
-    const input = $('gameMsgInput');
-    const content = input.value.trim();
-    if (!content) return;
-    try {
-        await apiFetch(`/games/${state.currentGameId}/messages`, {
-            method: 'POST',
-            body: JSON.stringify({ content })
-        });
-        input.value = '';
-        await loadGameChat(true);
-    } catch (err) { toast('error', err.message, err.title || 'No se pudo enviar el mensaje'); }
-}
-
-/* ============================================================== perfil ==== */
+/* ============================================================= perfil ===== */
 
 async function loadProfile() {
     await refreshMe();
+    renderProfile();
     fillEditFields();
     loadHistory(true);
 }
 
 function fillEditFields() {
     if (!state.user) return;
-    const active = document.activeElement;
-    const setIfIdle = (id, value) => { if (active !== $(id)) $(id).value = value; };
-    setIfIdle('editUsername', state.user.username || '');
-    setIfIdle('editEmail', state.user.email || '');
-    setIfIdle('editPassword', '');
+    $('editUsername').value = state.user.username || '';
+    $('editEmail').value = state.user.email || '';
+    $('editPassword').value = '';
 }
 
 function renderProfile() {
-    if (!state.user) return;
     const u = state.user;
-    $('profileAvatar').textContent = initials(u.username);
+    if (!u) return;
+    setAvatar($('profileAvatar'), u.username);
     $('profileUsername').textContent = u.username || '-';
     $('profileId').textContent = u.id != null ? u.id : '-';
     $('profileElo').textContent = u.elo != null ? u.elo : 1500;
     $('profileWins').textContent = u.wins || 0;
     $('profileLosses').textContent = u.losses || 0;
-    const wins = u.wins || 0;
-    const losses = u.losses || 0;
-    const total = wins + losses;
-    $('profileWinrate').textContent = total ? `${Math.round((wins / total) * 100)}%` : '—';
+    const total = (u.wins || 0) + (u.losses || 0);
+    $('profileWinrate').textContent = total ? `${Math.round((u.wins || 0) * 100 / total)}%` : '—';
     $('profileSince').textContent = fmtDate(u.createdAt);
 }
 
@@ -668,53 +1128,40 @@ $('copyIdBtn').addEventListener('click', async () => {
     const id = String(state.user.id);
     try {
         await navigator.clipboard.writeText(id);
-        toast('success', `ID ${id} copiado al portapapeles.`, 'ID copiado');
+        toast('success', `Tu ID (${id}) está en el portapapeles.`, 'ID copiado');
     } catch (e) {
-        const tmp = document.createElement('textarea');
-        tmp.value = id;
-        document.body.appendChild(tmp);
-        tmp.select();
-        try { document.execCommand('copy'); toast('success', `ID ${id} copiado.`, 'ID copiado'); }
-        catch (e2) { toast('error', `Tu ID es ${id}. Cópialo manualmente.`, 'No se pudo copiar'); }
-        tmp.remove();
+        toast('info', `Tu ID es ${id}.`, 'Cópialo a mano');
     }
 });
 
 $('profileForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!state.user) return;
-    const form = $('profileForm');
-    if (!form.reportValidity()) return;
-
     const username = $('editUsername').value.trim();
     const email = $('editEmail').value.trim();
     const password = $('editPassword').value;
 
     const body = {};
-    if (username && username !== state.user.username) body.username = username;
+    if (username && username !== state.user.username) {
+        if (username.length < 3 || username.length > 50) { toast('warning', 'El nombre debe tener entre 3 y 50 caracteres.', 'Nombre no válido'); return; }
+        body.username = username;
+    }
     if (email && email !== (state.user.email || '')) body.email = email;
     if (password) {
         if (password.length < 3) { toast('warning', 'La contraseña debe tener al menos 3 caracteres.', 'Contraseña débil'); return; }
         body.password = password;
     }
-
-    if (!Object.keys(body).length) {
-        toast('info', 'No hay cambios que guardar.', 'Perfil');
-        return;
-    }
+    if (!Object.keys(body).length) { toast('info', 'No hay cambios que guardar.', 'Perfil'); return; }
 
     try {
-        const updated = await apiFetch(`/users/${state.user.id}`, {
-            method: 'PUT',
-            body: JSON.stringify(body)
-        });
+        const updated = await apiFetch(`/users/${state.user.id}`, { method: 'PUT', body: JSON.stringify(body) });
         state.user = { ...state.user, ...updated };
         saveUser();
         syncUserUI();
         renderProfile();
         fillEditFields();
         loadRanking(true);
-        toast('success', 'Tu perfil se ha actualizado correctamente.', 'Perfil guardado');
+        toast('success', 'Tu perfil se ha actualizado.', 'Guardado');
     } catch (err) {
         toast('error', err.message, err.title || 'No se pudo actualizar el perfil');
     }
@@ -725,8 +1172,7 @@ $('refreshHistoryBtn').addEventListener('click', () => loadHistory(true));
 let lastHistoryJson = '';
 
 async function loadHistory(force) {
-    if (!state.user || !state.user.id) return;
-    if (inflight.history) return;
+    if (!state.user || inflight.history) return;
     inflight.history = true;
     try {
         const games = await apiFetch(`/games?player=${state.user.id}`);
@@ -740,57 +1186,44 @@ async function loadHistory(force) {
     finally { inflight.history = false; }
 }
 
-function historyBadge(g, meId) {
-    if (g.status === 'WAITING') return { cls: 'wait', text: 'Esperando' };
-    if (g.status === 'ACTIVE') return { cls: 'live', text: 'En curso' };
-    if (g.status === 'ABANDONED') {
-        if (!g.winner) return { cls: 'off', text: 'Abandonada' };
-        return g.winner.id === meId
-            ? { cls: 'win', text: 'Victoria (abandono)' }
-            : { cls: 'loss', text: 'Derrota (abandono)' };
-    }
-    if (g.status === 'FINISHED') {
-        if (!g.winner) return { cls: 'off', text: 'Sin resultado' };
-        return g.winner.id === meId
-            ? { cls: 'win', text: 'Victoria' }
-            : { cls: 'loss', text: 'Derrota' };
-    }
-    return { cls: 'off', text: g.status || '-' };
+function historyBadge(g, me) {
+    if (g.status === 'WAITING') return { cls: 'wait', text: '…', label: 'Esperando rival' };
+    if (g.status === 'ACTIVE') return { cls: 'live', text: '●', label: 'En curso' };
+    if (!g.winner) return { cls: 'off', text: '—', label: 'Cancelada' };
+    const won = g.winner.id === me;
+    const how = g.status === 'ABANDONED' ? ' por abandono' : '';
+    return won ? { cls: 'win', text: 'V', label: 'Victoria' + how } : { cls: 'loss', text: 'D', label: 'Derrota' + how };
 }
 
 function renderHistory() {
     const box = $('historyList');
     $('profileGames').textContent = state.history.length;
     if (!state.history.length) {
-        box.innerHTML = emptyState('Aún no has jugado ninguna partida', 'Entra al lobby y crea tu primera partida.');
+        box.innerHTML = emptyState('Aún no has jugado ninguna partida', 'Ve al lobby y lanza una partida rápida.');
         return;
     }
-    const meId = state.user && state.user.id;
+    const me = state.user.id;
     box.innerHTML = state.history.map(g => {
-        const isBlack = g.blackPlayer && g.blackPlayer.id === meId;
+        const isBlack = g.blackPlayer && g.blackPlayer.id === me;
         const opp = isBlack ? g.whitePlayer : g.blackPlayer;
-        const badge = historyBadge(g, meId);
-        const eloDelta = g.mode === 'RANKED'
-            ? (isBlack ? g.eloChangeBlack : g.eloChangeWhite)
-            : null;
+        const badge = historyBadge(g, me);
+        const delta = g.mode === 'RANKED' ? (isBlack ? g.eloChangeBlack : g.eloChangeWhite) : null;
         const score = g.status === 'FINISHED' && g.finalScoreBlack != null
-            ? `<span>Negras ${g.finalScoreBlack} · Blancas ${g.finalScoreWhite}</span>`
-            : '';
-        return `<div class="historyRow">
-            <span class="resultBadge resultBadge--${badge.cls}">${esc(badge.text)}</span>
-            <div class="historyInfo">
-                <span class="historyTitle">#${esc(g.id)} · ${opp ? 'vs ' + esc(opp.username) : 'Sin rival aún'}</span>
+            ? `<span>${esc(g.finalScoreBlack)} – ${esc(g.finalScoreWhite)}</span>` : '';
+        return `<div class="itemRow">
+            <span class="resultBadge resultBadge--${badge.cls}" title="${esc(badge.label)}">${badge.text}</span>
+            <div class="itemInfo">
+                <span class="itemName"><span class="stone ${isBlack ? 'stone--b' : 'stone--w'}"></span> ${opp ? 'vs ' + esc(opp.username) : 'Sin rival'} <span class="muted small">· ${esc(badge.label)}</span></span>
                 <span class="historyMeta">
-                    <span>${esc(g.mode)}</span>
-                    <span>${esc(g.boardSize)}</span>
-                    <span>${esc(fmtDate(g.createdAt))}</span>
+                    <span>#${esc(g.id)}</span>
+                    <span>${esc(SIZE_LABEL[g.boardSize])}</span>
+                    <span>${esc(MODE_LABEL[g.mode])}</span>
                     ${score}
-                    ${eloDelta != null ? `<span>ELO ${eloDelta >= 0 ? '+' : ''}${eloDelta}</span>` : ''}
+                    ${delta != null ? `<span class="eloDelta ${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '+' : ''}${esc(delta)} ELO</span>` : ''}
+                    <span>${esc(fmtDate(g.createdAt))}</span>
                 </span>
             </div>
-            <div class="itemActions">
-                <button class="btn btnGhost btnSm" data-history="${esc(g.id)}" type="button">Ver</button>
-            </div>
+            <button class="iconBtn iconBtnSm" data-history="${esc(g.id)}" type="button" title="Ver partida">${icon('eye')}</button>
         </div>`;
     }).join('');
 }
@@ -800,446 +1233,429 @@ $('historyList').addEventListener('click', (e) => {
     if (btn) openGame(btn.dataset.history);
 });
 
-/* ============================================================= partida ==== */
+/* ============================================================ partida ===== */
 
-$('passBtn').addEventListener('click', async () => {
-    if (!state.currentGameId) return;
-    try {
-        const game = await apiFetch(`/games/${state.currentGameId}/moves`, {
-            method: 'POST',
-            body: JSON.stringify({ pass: true })
-        });
-        applyGame(game);
-        toast('info', 'Has pasado turno.', 'Turno pasado');
-    } catch (err) {
-        toast('error', err.message, err.title || 'No se pudo pasar el turno');
+const canvas = $('goBoard');
+const bctx = canvas.getContext('2d');
+let boardPx = 640;
+let boardDpr = 1;
+let hoverPoint = null;
+let lastGameChatJson = '';
+
+function boardSize() {
+    return state.game ? (SIZE_NUM[state.game.boardSize] || 9) : 9;
+}
+
+function myColor(g) {
+    if (!state.user || !g) return null;
+    if (g.blackPlayer && g.blackPlayer.id === state.user.id) return 'BLACK';
+    if (g.whitePlayer && g.whitePlayer.id === state.user.id) return 'WHITE';
+    return null;
+}
+
+function canPlay() {
+    const g = state.game;
+    return !!g && g.status === 'ACTIVE' && myColor(g) === g.currentTurn;
+}
+
+function moveEntries(g) {
+    return g && g.moveHistory ? String(g.moveHistory).split(',').map(s => s.trim()).filter(Boolean) : [];
+}
+
+function parseBoard(json) {
+    if (!json) return {};
+    try { return JSON.parse(json) || {}; } catch (e) { return {}; }
+}
+
+function lastMove(g) {
+    const entries = moveEntries(g);
+    for (let i = entries.length - 1; i >= 0; i--) {
+        const c = Board.parseCoord(entries[i]);
+        if (c) return c;
     }
-});
-
-$('leaveBtn').addEventListener('click', async () => {
-    if (!state.currentGameId) return;
-    if (!confirm('¿Abandonar la partida? Se dará por perdida.')) return;
-    try {
-        await apiFetch(`/games/${state.currentGameId}/leave`, { method: 'POST' });
-        state.currentGameId = null;
-        state.currentGame = null;
-        views.gameSection.style.display = 'none';
-        views.mainSection.style.display = 'flex';
-        toast('info', 'Has abandonado la partida.', 'Partida');
-        loadGames(true);
-    } catch (err) { toast('error', err.message, err.title || 'No se pudo abandonar'); }
-});
+    return null;
+}
 
 async function openGame(gameId) {
     try {
-        const game = await apiFetch(`/games/${gameId}`);
-        state.currentGame = game;
-        state.currentGameId = gameId;
-        state.boardSize = game.boardSize === 'THIRTEEN' ? 13 : (game.boardSize === 'NINETEEN' ? 19 : 9);
+        const g = await apiFetch(`/games/${gameId}`);
+        state.gameId = String(gameId);
+        state.game = null;
         lastGameChatJson = '';
-        views.mainSection.style.display = 'none';
-        views.gameSection.style.display = 'flex';
-        $('gameIdSpan').textContent = gameId;
-        applyGame(game);
-        await loadGameChat(true);
+        hoverPoint = null;
+        $('leaveConfirm').hidden = true;
+        switchView('gameView');
+        applyGame(g);
+        loadGameChat(true);
         requestAnimationFrame(fitBoard);
     } catch (err) {
         toast('error', err.message, err.title || 'No se pudo abrir la partida');
     }
 }
 
-function myColor(game) {
-    if (!state.user || !game) return null;
-    if (game.blackPlayer && game.blackPlayer.id === state.user.id) return 'BLACK';
-    if (game.whitePlayer && game.whitePlayer.id === state.user.id) return 'WHITE';
-    return null;
-}
+$('backToLobbyBtn').addEventListener('click', () => switchView('lobbyView'));
 
-function applyGame(game) {
-    const previous = state.currentGame;
-    state.currentGame = game;
+function applyGame(g) {
+    const prev = state.game && String(state.game.id) === String(g.id) ? state.game : null;
+    state.game = g;
+    const mine = myColor(g);
 
-    const statusEl = $('gameStatus');
-    const statusConf = {
-        ACTIVE: { cls: 'statusChip--active', text: 'En juego' },
-        WAITING: { cls: 'statusChip--wait', text: 'Esperando rival' },
-        FINISHED: { cls: 'statusChip--done', text: 'Finalizada' },
-        ABANDONED: { cls: 'statusChip--off', text: 'Abandonada' }
-    }[game.status] || { cls: '', text: game.status || '-' };
-    statusEl.className = `statusChip ${statusConf.cls}`;
-    statusEl.textContent = statusConf.text;
-
-    const turnEl = $('gameTurn');
-    if (game.status === 'ACTIVE' && game.currentTurn) {
-        const isBlack = game.currentTurn === 'BLACK';
-        const turnPlayer = isBlack ? game.blackPlayer : game.whitePlayer;
-        const mine = myColor(game) === game.currentTurn;
-        turnEl.className = 'turnChip';
-        turnEl.innerHTML = `<span class="stoneDot ${isBlack ? 'black' : 'white'}"></span>${mine ? 'Tu turno' : 'Turno de ' + esc(turnPlayer ? turnPlayer.username : (isBlack ? 'Negras' : 'Blancas'))}`;
-    } else {
-        turnEl.className = 'turnChip turnChip--hidden';
-        turnEl.textContent = '';
+    // --- sonidos y avisos según lo que haya cambiado
+    if (prev) {
+        const before = moveEntries(prev);
+        const after = moveEntries(g);
+        if (after.length > before.length) {
+            const last = after[after.length - 1];
+            const caps = (g.capturesBlack + g.capturesWhite) - (prev.capturesBlack + prev.capturesWhite);
+            if (last !== '-') {
+                if (caps > 0) Sound.capture(caps); else Sound.stone();
+            }
+            if (last === '-' && mine && g.status === 'ACTIVE' && g.currentTurn === mine) {
+                toast('info', 'Tu rival ha pasado. Si pasas tú también, termina la partida.', 'El rival pasa');
+            }
+        }
+        if (prev.status === 'WAITING' && g.status === 'ACTIVE') {
+            Sound.chime(true);
+            toast('success', `${g.whitePlayer ? g.whitePlayer.username : 'Tu rival'} se ha unido. Empiezan negras.`, '¡Rival encontrado!');
+        }
+        if (prev.status === 'ACTIVE' && (g.status === 'FINISHED' || g.status === 'ABANDONED')) {
+            const won = g.winner && state.user && g.winner.id === state.user.id;
+            Sound.chime(!!won || !mine);
+            if (g.winner) {
+                toast(won ? 'success' : 'info',
+                    won ? '¡Enhorabuena, has ganado!' : `${g.winner.username} gana la partida.`,
+                    g.status === 'ABANDONED' ? 'Victoria por abandono' : 'Partida terminada');
+            }
+            refreshMe();
+            loadRanking(true);
+        }
     }
 
-    renderPlayer('blackPlayer', game, 'BLACK', 'Negras');
-    renderPlayer('whitePlayer', game, 'WHITE', 'Blancas');
-    renderGameResult(game);
+    // --- cabecera
+    $('gameIdSpan').textContent = g.id;
+    $('gameMeta').textContent = `${SIZE_LABEL[g.boardSize]} · ${MODE_LABEL[g.mode]}`;
+    const st = STATUS[g.status] || { cls: '', text: g.status };
+    $('gameStatus').className = `chip ${st.cls}`;
+    $('gameStatus').textContent = st.text;
 
-    if (previous && previous.status === 'ACTIVE' && game.status === 'FINISHED' && game.winner) {
-        const meWon = state.user && game.winner.id === state.user.id;
-        toast(meWon ? 'success' : 'info',
-            `${game.winner.username} ha ganado la partida #${game.id}.`,
-            'Partida finalizada');
-    }
+    // --- jugadores: tú siempre abajo (si miras, negras abajo)
+    const bottom = mine || 'BLACK';
+    renderPlayerCard($('bottomPlayer'), g, bottom);
+    renderPlayerCard($('topPlayer'), g, bottom === 'BLACK' ? 'WHITE' : 'BLACK');
 
+    renderTurn(g, mine);
+    renderMoves(g);
+    renderActions(g, mine);
+    renderResult(g, mine);
+    renderOverlay(g, mine);
+
+    // --- chat: el backend solo admite mensajes de jugadores en partidas activas
+    const chatOk = !!mine && g.status === 'ACTIVE';
+    $('gameMsgInput').disabled = !chatOk;
+    $('sendGameMsgBtn').disabled = !chatOk;
+    $('gameMsgInput').placeholder = chatOk ? 'Di algo amable...'
+        : (mine ? 'Chat cerrado' : 'Solo para jugadores');
+
+    $('boardFrame').classList.toggle('readonly', !canPlay());
+    document.title = canPlay() ? `● Tu turno · Partida #${g.id}` : `Partida #${g.id} · GoUSC`;
     drawBoard();
 }
 
-function renderPlayer(id, game, color, label) {
-    const el = $(id);
-    const player = color === 'BLACK' ? game.blackPlayer : game.whitePlayer;
-    const captures = color === 'BLACK' ? game.capturesBlack : game.capturesWhite;
-    const isTurn = game.status === 'ACTIVE' && game.currentTurn === color;
-    const mine = myColor(game) === color;
-    const komi = color === 'WHITE' && game.komi != null ? ` · komi ${game.komi}` : '';
-    el.className = `playerRow${isTurn ? ' isTurn' : ''}`;
+function renderPlayerCard(el, g, color) {
+    const p = color === 'BLACK' ? g.blackPlayer : g.whitePlayer;
+    const caps = color === 'BLACK' ? g.capturesBlack : g.capturesWhite;
+    const isTurn = g.status === 'ACTIVE' && g.currentTurn === color;
+    const isMe = p && state.user && p.id === state.user.id;
+    const delta = g.mode === 'RANKED' ? (color === 'BLACK' ? g.eloChangeBlack : g.eloChangeWhite) : null;
+    el.className = `playerCard${isTurn ? ' isTurn' : ''}${p ? '' : ' empty'}`;
     el.innerHTML = `
-        <span class="stoneDot ${color === 'BLACK' ? 'black' : 'white'}"></span>
-        <div class="playerInfo">
-            <span class="playerName">${esc(player ? player.username : 'Por jugar')}</span>
-            <span class="playerMeta">${label} · ${captures != null ? captures : 0} capturas${komi}</span>
+        <span class="stone ${color === 'BLACK' ? 'stone--b' : 'stone--w'}"></span>
+        <div class="pcInfo">
+            <span class="pcName">${p ? esc(p.username) : 'Esperando rival…'}${isMe ? '<small>(tú)</small>' : ''}</span>
+            <span class="pcMeta">${p ? `ELO ${esc(p.elo)}` : 'Sala abierta'}${delta != null ? ` · <span class="eloDelta ${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '+' : ''}${esc(delta)}</span>` : ''}${color === 'WHITE' ? ` · komi ${esc(g.komi)}` : ''}</span>
         </div>
-        ${isTurn ? `<span class="turnTag">${mine ? 'Tu turno' : 'Turno'}</span>` : ''}`;
+        <div class="pcCaps" title="Piedras capturadas"><b>${esc(caps || 0)}</b><span>presas</span></div>`;
 }
 
-function myEloDelta(game) {
-    if (game.mode !== 'RANKED') return null;
-    const mine = myColor(game);
-    if (mine === 'BLACK') return game.eloChangeBlack;
-    if (mine === 'WHITE') return game.eloChangeWhite;
-    return null;
-}
-
-function eloLine(delta) {
-    if (delta == null) return '';
-    return `<div class="resultElo">Tu ELO: <span class="${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '+' : ''}${delta}</span></div>`;
-}
-
-function renderGameResult(game) {
-    const box = $('gameResult');
-    if (game.status === 'FINISHED') {
-        box.style.display = 'block';
-        box.innerHTML = `
-            <div class="resultTitle">${game.winner ? `Ganador: ${esc(game.winner.username)}` : 'Partida finalizada'}</div>
-            <div class="resultLine"><span>Negras</span><strong>${game.finalScoreBlack != null ? game.finalScoreBlack : '—'}</strong></div>
-            <div class="resultLine"><span>Blancas</span><strong>${game.finalScoreWhite != null ? game.finalScoreWhite : '—'}</strong></div>
-            ${eloLine(myEloDelta(game))}`;
-    } else if (game.status === 'ABANDONED') {
-        box.style.display = 'block';
-        box.innerHTML = game.winner
-            ? `<div class="resultTitle">Ganador por abandono: ${esc(game.winner.username)}</div>
-               ${eloLine(myEloDelta(game))}`
-            : `<div class="resultTitle">Partida abandonada</div>
-               <div class="resultLine"><span>Estado</span><strong>No se contabiliza</strong></div>`;
+function renderTurn(g, mine) {
+    const el = $('gameTurn');
+    el.className = 'turnBanner';
+    if (g.status === 'ACTIVE') {
+        const black = g.currentTurn === 'BLACK';
+        const p = black ? g.blackPlayer : g.whitePlayer;
+        const isMine = mine === g.currentTurn;
+        if (isMine) el.classList.add('mine');
+        el.innerHTML = `<span class="stone ${black ? 'stone--b' : 'stone--w'}"></span>${isMine ? 'Te toca jugar' : `Turno de ${esc(p ? p.username : (black ? 'negras' : 'blancas'))}`}`;
+    } else if (g.status === 'WAITING') {
+        el.textContent = 'Esperando a que se una un rival';
     } else {
-        box.style.display = 'none';
-        box.innerHTML = '';
+        el.textContent = g.status === 'FINISHED' ? 'Partida terminada' : 'Partida abandonada';
+    }
+}
+
+let lastMovesKey = '';
+
+function renderMoves(g) {
+    const entries = moveEntries(g);
+    const key = g.id + ':' + entries.length;
+    if (key === lastMovesKey) return;
+    lastMovesKey = key;
+    const box = $('moveList');
+    if (!entries.length) {
+        box.innerHTML = `<div class="emptyMoves">${g.status === 'WAITING' ? 'La partida aún no ha empezado' : 'Negras abren la partida'}</div>`;
+        return;
+    }
+    let html = '';
+    for (let i = 0; i < entries.length; i += 2) {
+        html += `<span class="mvNum">${i / 2 + 1}</span>`;
+        for (let j = i; j < i + 2; j++) {
+            if (j >= entries.length) { html += '<span class="mv"></span>'; continue; }
+            const pass = entries[j] === '-';
+            html += `<span class="mv${pass ? ' pass' : ''}${j === entries.length - 1 ? ' last' : ''}">${pass ? 'pasa' : esc(entries[j])}</span>`;
+        }
+    }
+    box.innerHTML = html;
+    box.scrollTop = box.scrollHeight;
+}
+
+function renderActions(g, mine) {
+    const show = !!mine && g.status === 'ACTIVE';
+    $('gameActions').hidden = !show;
+    if (!show) $('leaveConfirm').hidden = true;
+    $('passBtn').disabled = !canPlay();
+}
+
+function renderResult(g, mine) {
+    const box = $('gameResult');
+    if (g.status !== 'FINISHED' && g.status !== 'ABANDONED') { box.hidden = true; return; }
+    box.hidden = false;
+    const delta = g.mode === 'RANKED' && mine ? (mine === 'BLACK' ? g.eloChangeBlack : g.eloChangeWhite) : null;
+    const winnerColor = g.winner && g.blackPlayer && g.winner.id === g.blackPlayer.id ? 'b' : 'w';
+    let html;
+    if (!g.winner) {
+        html = `<div class="resultHead">Partida cancelada</div><div class="resultWinner">Sin resultado</div>`;
+    } else {
+        const head = g.status === 'ABANDONED' ? 'Victoria por abandono' : 'Resultado';
+        html = `<div class="resultHead">${head}</div>
+            <div class="resultWinner"><span class="stone stone--${winnerColor}"></span>${esc(g.winner.username)} gana</div>`;
+        if (g.status === 'FINISHED' && g.finalScoreBlack != null) {
+            const diff = Math.abs(g.finalScoreWhite - g.finalScoreBlack);
+            html += `<div class="resultScores">
+                <span><span class="stone stone--b"></span> <b>${esc(g.finalScoreBlack)}</b></span>
+                <span><span class="stone stone--w"></span> <b>${esc(g.finalScoreWhite)}</b></span>
+                <span>por ${esc(diff)} pts</span>
+            </div>`;
+        }
+    }
+    if (delta != null) html += `<div class="resultElo ${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '+' : ''}${esc(delta)} ELO</div>`;
+    box.innerHTML = html;
+}
+
+function renderOverlay(g, mine) {
+    const el = $('boardOverlay');
+    if (g.status !== 'WAITING') { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    if (mine) {
+        el.innerHTML = `<div class="overlayCard">
+            <span class="waitingStones"><span class="stone stone--b"></span><span class="stone stone--w"></span><span class="stone stone--b"></span></span>
+            <div class="overlayTitle">Esperando rival…</div>
+            <div class="overlayText">Tu sala <b>#${esc(g.id)}</b> aparece en el lobby. En cuanto alguien se una empezáis: tú juegas con negras.</div>
+            <button class="btn btnGhost btnSm" id="cancelWaitBtn" type="button">${icon('x')}Cancelar sala</button>
+        </div>`;
+        $('cancelWaitBtn').addEventListener('click', () => leaveGame(true));
+    } else {
+        el.innerHTML = `<div class="overlayCard">
+            <div class="overlayTitle">Sala abierta</div>
+            <div class="overlayText">${esc(g.blackPlayer.username)} (${esc(g.blackPlayer.elo)}) busca rival para una ${esc(SIZE_LABEL[g.boardSize])} ${esc(MODE_LABEL[g.mode])}.</div>
+            <button class="btn btnPrimary" id="overlayJoinBtn" type="button">${icon('play')}Jugar con blancas</button>
+        </div>`;
+        $('overlayJoinBtn').addEventListener('click', () => joinGame(g.id));
     }
 }
 
 async function refreshActiveGame() {
-    if (!state.currentGameId) return;
-    if (inflight.game) return;
+    if (!state.gameId || inflight.game) return;
     inflight.game = true;
+    const id = state.gameId;
     try {
-        const g = await apiFetch(`/games/${state.currentGameId}`);
-        if (!g) return;
-        const changed = JSON.stringify(g) !== JSON.stringify(state.currentGame);
-        if (changed) applyGame(g);
+        const g = await apiFetch(`/games/${id}`);
+        if (state.gameId !== id || !g) return;
+        if (JSON.stringify(g) !== JSON.stringify(state.game)) applyGame(g);
         loadGameChat(false);
-    } catch (e) { /* la partida puede haber desaparecido */ }
+    } catch (e) { /* conexión intermitente: se reintenta en el siguiente tick */ }
     finally { inflight.game = false; }
 }
 
-/* ------------------------------------------------------------ tablero ----- */
-
-const canvas = $('goBoard');
-const ctx = canvas.getContext('2d');
-const PAD_RATIO = 1.15;
-const COL_LABELS = 'ABCDEFGHJKLMNOPQRST';
-
-let boardPx = 600;
-let dpr = 1;
-let hoverPoint = null;
-
-function gridMetrics() {
-    const size = state.boardSize;
-    const cell = boardPx / (size - 1 + 2 * PAD_RATIO);
-    return { size, cell, pad: cell * PAD_RATIO };
-}
-
-function fitBoard() {
-    const frame = canvas.parentElement;
-    const avail = frame ? frame.clientWidth : 0;
-    if (!avail) return;
-    const cssSize = Math.max(140, Math.min(Math.floor(avail), 660));
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    boardPx = cssSize;
-    canvas.style.width = cssSize + 'px';
-    canvas.style.height = cssSize + 'px';
-    canvas.width = Math.round(cssSize * dpr);
-    canvas.height = Math.round(cssSize * dpr);
-    drawBoard();
-}
-
-function parseBoard(json) {
-    if (!json) return {};
-    try { return JSON.parse(json) || {}; }
-    catch (e) { return {}; }
-}
-
-function drawStone(px, py, radius, color, alpha) {
-    ctx.save();
-    if (alpha != null) ctx.globalAlpha = alpha;
-    ctx.shadowColor = 'rgba(15, 10, 5, .45)';
-    ctx.shadowBlur = radius * 0.5;
-    ctx.shadowOffsetY = radius * 0.18;
-    const grad = ctx.createRadialGradient(px - radius * 0.35, py - radius * 0.4, radius * 0.12, px, py, radius);
-    if (color === 'B') {
-        grad.addColorStop(0, '#7d8797');
-        grad.addColorStop(0.45, '#262c38');
-        grad.addColorStop(1, '#05070c');
-    } else {
-        grad.addColorStop(0, '#ffffff');
-        grad.addColorStop(0.55, '#f2f5fa');
-        grad.addColorStop(1, '#c6cdda');
-    }
-    ctx.beginPath();
-    ctx.arc(px, py, radius, 0, Math.PI * 2);
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.shadowColor = 'transparent';
-    ctx.lineWidth = Math.max(0.7, radius * 0.07);
-    ctx.strokeStyle = color === 'B' ? 'rgba(0,0,0,.7)' : 'rgba(120,132,155,.85)';
-    ctx.stroke();
-    ctx.restore();
-}
-
-function starPoints(size) {
-    if (size >= 19) return [[3, 3], [3, 9], [3, 15], [9, 3], [9, 9], [9, 15], [15, 3], [15, 9], [15, 15]];
-    if (size >= 13) return [[3, 3], [3, 6], [3, 9], [6, 3], [6, 6], [6, 9], [9, 3], [9, 6], [9, 9]];
-    if (size >= 9) return [[2, 2], [2, 6], [4, 4], [6, 2], [6, 6]];
-    return [];
-}
-
-function lastMoveCoord() {
-    const game = state.currentGame;
-    if (!game || !game.moveHistory) return null;
-    const entries = String(game.moveHistory).split(',').map(s => s.trim()).filter(Boolean);
-    for (let i = entries.length - 1; i >= 0; i--) {
-        const entry = entries[i];
-        if (entry === '-' || entry.length < 2) continue;
-        return parseCoordLabel(entry);
-    }
-    return null;
-}
-
-function parseCoordLabel(label) {
-    const col = label[0].toUpperCase();
-    let x = col.charCodeAt(0) - 65;
-    if (x > 8) x--;
-    const y = parseInt(label.slice(1), 10) - 1;
-    if (isNaN(x) || isNaN(y) || x < 0 || y < 0) return null;
-    return { x, y };
-}
-
-function drawBoard() {
-    const { size, cell, pad } = gridMetrics();
-    const end = pad + (size - 1) * cell;
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, boardPx, boardPx);
-
-    const wood = ctx.createLinearGradient(0, 0, boardPx, boardPx);
-    wood.addColorStop(0, '#eed49f');
-    wood.addColorStop(0.5, '#e4c184');
-    wood.addColorStop(1, '#d5a961');
-    ctx.fillStyle = wood;
-    ctx.fillRect(0, 0, boardPx, boardPx);
-
-    ctx.strokeStyle = 'rgba(58, 38, 16, .78)';
-    ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(1, cell * 0.045);
-    for (let i = 0; i < size; i++) {
-        const p = pad + i * cell;
-        ctx.beginPath();
-        ctx.moveTo(pad, p);
-        ctx.lineTo(end, p);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(p, pad);
-        ctx.lineTo(p, end);
-        ctx.stroke();
-    }
-
-    ctx.lineWidth = Math.max(1.4, cell * 0.08);
-    ctx.strokeRect(pad, pad, end - pad, end - pad);
-
-    ctx.fillStyle = 'rgba(48, 30, 12, .85)';
-    for (const [sx, sy] of starPoints(size)) {
-        ctx.beginPath();
-        ctx.arc(pad + sx * cell, pad + sy * cell, Math.max(2.4, cell * 0.09), 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    const labelFont = `600 ${Math.max(9, Math.round(cell * 0.3))}px ui-sans-serif, system-ui, sans-serif`;
-    ctx.fillStyle = 'rgba(58, 38, 16, .8)';
-    ctx.font = labelFont;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (let i = 0; i < size; i++) {
-        const p = pad + i * cell;
-        if (i < COL_LABELS.length) ctx.fillText(COL_LABELS[i], p, pad * 0.48);
-        ctx.fillText(String(i + 1), pad * 0.46, p);
-    }
-
-    const board = parseBoard(state.currentGame ? state.currentGame.boardState : null);
-    const last = lastMoveCoord();
-    const stoneR = cell * 0.44;
-
-    for (let x = 0; x < size; x++) {
-        for (let y = 0; y < size; y++) {
-            const c = board[x + ',' + y];
-            if (c !== 'B' && c !== 'W') continue;
-            const px = pad + x * cell;
-            const py = pad + y * cell;
-            drawStone(px, py, stoneR, c);
-            if (last && last.x === x && last.y === y) {
-                ctx.beginPath();
-                ctx.arc(px, py, Math.max(2.5, cell * 0.11), 0, Math.PI * 2);
-                ctx.fillStyle = c === 'B' ? 'rgba(96, 165, 250, .95)' : 'rgba(37, 99, 235, .9)';
-                ctx.fill();
-            }
-        }
-    }
-
-    if (hoverPoint && canPlayHere()) {
-        const { x, y } = hoverPoint;
-        if (!board[x + ',' + y]) {
-            drawStone(pad + x * cell, pad + y * cell, stoneR, myColor(state.currentGame) === 'WHITE' ? 'W' : 'B', 0.42);
-            ctx.beginPath();
-            ctx.arc(pad + x * cell, pad + y * cell, stoneR, 0, Math.PI * 2);
-            ctx.lineWidth = 1.5;
-            ctx.strokeStyle = 'rgba(37, 99, 235, .8)';
-            ctx.stroke();
-        }
-    }
-}
-
-function canPlayHere() {
-    const g = state.currentGame;
-    if (!g || g.status !== 'ACTIVE') return false;
-    return myColor(g) === g.currentTurn;
-}
-
-function nearestIntersection(clientX, clientY) {
-    const rect = canvas.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
-    const px = (clientX - rect.left) * (boardPx / rect.width);
-    const py = (clientY - rect.top) * (boardPx / rect.height);
-    const { size, cell, pad } = gridMetrics();
-    const ix = Math.round((px - pad) / cell);
-    const iy = Math.round((py - pad) / cell);
-    if (ix < 0 || ix >= size || iy < 0 || iy >= size) return null;
-    if (Math.abs(pad + ix * cell - px) > cell / 2 + 0.5) return null;
-    if (Math.abs(pad + iy * cell - py) > cell / 2 + 0.5) return null;
-    return { x: ix, y: iy };
-}
+/* ------------------------------------------------------------- jugar --- */
 
 const MOVE_REASONS = {
     NOT_YOUR_TURN: 'No es tu turno: espera a que juegue tu rival.',
-    OCCUPIED_CELL: 'Esa intersección ya está ocupada por otra piedra.',
-    SUICIDE: 'No se permite jugar un suicidio sin capturas.',
-    KO: 'Esa jugada infringiría la regla del ko.',
+    OCCUPIED_CELL: 'Esa intersección ya está ocupada.',
+    SUICIDE: 'Jugada suicida: tu grupo se quedaría sin libertades.',
+    KO: 'Regla del ko: no puedes recapturar inmediatamente.',
     OUT_OF_RANGE: 'La jugada queda fuera del tablero.'
 };
 
 function moveErrorMessage(err) {
     const match = /([A-Z_]{3,})\s*$/.exec(err.message || '');
-    if (match && MOVE_REASONS[match[1]]) {
-        return { title: 'Movimiento incorrecto', msg: MOVE_REASONS[match[1]] };
-    }
-    return { title: err.title || 'Movimiento incorrecto', msg: err.message };
+    if (match && MOVE_REASONS[match[1]]) return { title: 'Jugada no válida', msg: MOVE_REASONS[match[1]] };
+    return { title: err.title || 'Jugada no válida', msg: err.message };
 }
 
-async function onBoardClick(e) {
-    if (!state.currentGameId || !state.user || !state.currentGame) return;
-    const point = nearestIntersection(e.clientX, e.clientY);
-    if (!point) return;
+let moving = false;
 
-    const game = state.currentGame;
-    const color = myColor(game);
-    if (!color) { toast('info', 'Solo los participantes pueden mover en el tablero.', 'Espectador'); return; }
-    if (game.status !== 'ACTIVE') { toast('warning', 'La partida no está en curso.', 'Partida ' + (game.status || '')); return; }
-    if (game.currentTurn !== color) { toast('info', 'Espera a que juegue tu rival.', 'No es tu turno'); return; }
-    if (parseBoard(game.boardState)[point.x + ',' + point.y]) {
-        toast('error', MOVE_REASONS.OCCUPIED_CELL, 'Movimiento incorrecto');
-        return;
-    }
-
+async function sendMove(body) {
+    if (moving) return;
+    moving = true;
     try {
-        const updated = await apiFetch(`/games/${state.currentGameId}/moves`, {
-            method: 'POST',
-            body: JSON.stringify({ x: point.x, y: point.y, pass: false })
-        });
-        applyGame(updated);
+        const g = await apiFetch(`/games/${state.gameId}/moves`, { method: 'POST', body: JSON.stringify(body) });
+        hoverPoint = null;
+        applyGame(g);
     } catch (err) {
         const info = moveErrorMessage(err);
         toast('error', info.msg, info.title);
-        drawBoard();
+    } finally {
+        moving = false;
     }
 }
 
-canvas.addEventListener('click', onBoardClick);
-canvas.addEventListener('mousemove', (e) => {
-    const point = nearestIntersection(e.clientX, e.clientY);
-    const key = point ? point.x + ',' + point.y : null;
-    const prevKey = hoverPoint ? hoverPoint.x + ',' + hoverPoint.y : null;
-    if (key !== prevKey) {
-        hoverPoint = point;
-        drawBoard();
-    }
-});
-canvas.addEventListener('mouseleave', () => {
-    if (hoverPoint) {
-        hoverPoint = null;
-        drawBoard();
-    }
+canvas.addEventListener('click', (e) => {
+    const g = state.game;
+    if (!g) return;
+    const p = Board.pick(canvas, boardPx, boardSize(), e.clientX, e.clientY);
+    if (!p) return;
+    const mine = myColor(g);
+    if (!mine) return;
+    if (g.status !== 'ACTIVE') return;
+    if (g.currentTurn !== mine) { toast('info', 'Espera a que juegue tu rival.', 'No es tu turno'); return; }
+    if (parseBoard(g.boardState)[p.x + ',' + p.y]) return;
+    sendMove({ x: p.x, y: p.y, pass: false });
 });
 
+canvas.addEventListener('mousemove', (e) => {
+    const p = canPlay() ? Board.pick(canvas, boardPx, boardSize(), e.clientX, e.clientY) : null;
+    const key = p ? p.x + ',' + p.y : '';
+    const prevKey = hoverPoint ? hoverPoint.x + ',' + hoverPoint.y : '';
+    if (key !== prevKey) { hoverPoint = p; drawBoard(); }
+});
+canvas.addEventListener('mouseleave', () => { if (hoverPoint) { hoverPoint = null; drawBoard(); } });
+
+$('passBtn').addEventListener('click', () => {
+    if (!canPlay()) return;
+    sendMove({ pass: true });
+});
+
+$('leaveBtn').addEventListener('click', () => { $('leaveConfirm').hidden = false; });
+$('leaveNo').addEventListener('click', () => { $('leaveConfirm').hidden = true; });
+$('leaveYes').addEventListener('click', () => leaveGame(false));
+
+async function leaveGame(cancelOnly) {
+    if (!state.gameId) return;
+    try {
+        const g = await apiFetch(`/games/${state.gameId}/leave`, { method: 'POST' });
+        $('leaveConfirm').hidden = true;
+        if (cancelOnly) {
+            toast('info', 'La sala se ha cerrado.', 'Sala cancelada');
+            switchView('lobbyView');
+        } else {
+            applyGame(g);   // detecta el cambio a ABANDONED: aviso, sonido y ELO
+        }
+    } catch (err) { toast('error', err.message, err.title || 'No se pudo abandonar'); }
+}
+
+/* ------------------------------------------------------ chat partida --- */
+
+async function loadGameChat(force) {
+    if (!state.gameId || inflight.gameChat) return;
+    inflight.gameChat = true;
+    const id = state.gameId;
+    try {
+        const msgs = await apiFetch(`/games/${id}/messages`);
+        if (state.gameId !== id) return;
+        const json = JSON.stringify(msgs);
+        if (!force && json === lastGameChatJson) return;
+        lastGameChatJson = json;
+        renderChatBox($('gameChatBox'), msgs || [], !force, true);
+    } catch (err) { console.error(err); }
+    finally { inflight.gameChat = false; }
+}
+
+$('gameChatForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = $('gameMsgInput');
+    const content = input.value.trim();
+    if (!state.gameId || !content) return;
+    try {
+        await apiFetch(`/games/${state.gameId}/messages`, { method: 'POST', body: JSON.stringify({ content }) });
+        input.value = '';
+        await loadGameChat(true);
+    } catch (err) { toast('error', err.message, err.title || 'No se pudo enviar el mensaje'); }
+});
+
+/* --------------------------------------------------------- dibujo ------ */
+
+function fitBoard() {
+    const frame = $('boardFrame');
+    const w = Math.floor(frame.clientWidth);
+    if (!w) return;
+    boardDpr = Math.min(window.devicePixelRatio || 1, 2);
+    boardPx = w;
+    canvas.width = Math.round(w * boardDpr);
+    canvas.height = Math.round(w * boardDpr);
+    drawBoard();
+}
+
+function drawBoard() {
+    const g = state.game;
+    const mine = myColor(g);
+    Board.draw(bctx, {
+        px: boardPx,
+        dpr: boardDpr,
+        size: boardSize(),
+        board: parseBoard(g ? g.boardState : null),
+        last: lastMove(g),
+        ghost: hoverPoint && canPlay() ? hoverPoint : null,
+        ghostColor: mine === 'WHITE' ? 'W' : 'B'
+    });
+}
+
 if (window.ResizeObserver) {
-    new ResizeObserver(() => fitBoard()).observe(canvas.parentElement);
+    new ResizeObserver(() => { if (state.view === 'gameView') fitBoard(); }).observe($('boardFrame'));
 } else {
     window.addEventListener('resize', fitBoard);
 }
 
+/** Tablero decorativo de la pantalla de acceso. */
+function drawHero() {
+    const hero = $('heroBoard');
+    if (!hero || !hero.offsetWidth) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const px = 420;
+    hero.width = px * dpr;
+    hero.height = px * dpr;
+    const b = {};
+    [[2, 6], [3, 6], [2, 4], [3, 3], [6, 2], [5, 3], [6, 6], [4, 2], [2, 2]].forEach(([x, y]) => { b[x + ',' + y] = 'B'; });
+    [[6, 5], [5, 6], [4, 5], [5, 4], [4, 4], [6, 3], [3, 5], [7, 4]].forEach(([x, y]) => { b[x + ',' + y] = 'W'; });
+    Board.draw(hero.getContext('2d'), { px, dpr, size: 9, board: b, last: { x: 4, y: 4 }, coords: false });
+}
+
 /* ================================================== refresco automático === */
 
-const TICK_MS = 2500;
+let ticks = 0;
 
 function tick() {
-    if (document.hidden) return;
-    if (views.gameSection.style.display !== 'none') {
-        refreshActiveGame();
-        return;
+    if (document.hidden || !state.user) return;
+    ticks++;
+    switch (state.view) {
+        case 'gameView': refreshActiveGame(); break;
+        case 'lobbyView': loadGames(); if (ticks % 4 === 0) loadRanking(); break;
+        case 'rankingView': loadRanking(); break;
+        case 'friendsView': loadFriends(); break;
+        case 'chatView': loadPrivateChat(false); break;
+        case 'profileView': loadHistory(false); break;
     }
-    if (views.mainSection.style.display === 'none') return;
-    const active = document.querySelector('.navBtn.active');
-    const view = active ? active.dataset.view : '';
-    if (view === 'lobbyView') loadGames();
-    else if (view === 'rankingView') loadRanking();
-    else if (view === 'friendsView') loadFriends();
-    else if (view === 'chatView') loadPrivateChat(false);
+    if (ticks % 6 === 0 && state.view !== 'friendsView') loadFriends();
+    if (ticks % 12 === 0) refreshMe();
 }
 
 setInterval(tick, TICK_MS);
@@ -1247,9 +1663,13 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) tick
 
 /* ================================================================ inicio == */
 
-const saved = localStorage.getItem('gousc_user');
-if (saved) {
-    try { setAuth(JSON.parse(saved)); } catch (e) { setAuth(null); }
-} else {
-    setAuth(null);
-}
+applyTheme();
+applySound();
+renderProverb();
+
+(() => {
+    const saved = store.get('gousc_user');
+    let user = null;
+    try { user = saved ? JSON.parse(saved) : null; } catch (e) { user = null; }
+    setAuth(user && user.id ? user : null);
+})();

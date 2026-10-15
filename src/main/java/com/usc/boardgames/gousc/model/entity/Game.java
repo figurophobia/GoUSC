@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Accessors(chain = true)
+@NoArgsConstructor
 public class Game {
 
     @Id
@@ -94,8 +96,6 @@ public class Game {
 
     @Column
     private LocalDateTime finishedAt;
-
-    public Game() {}
 
     public Game(BoardSize boardSize, GameMode mode, User blackPlayer) {
         this.boardSize = boardSize;

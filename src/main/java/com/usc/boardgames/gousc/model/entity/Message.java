@@ -12,6 +12,7 @@ import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Accessors(chain = true)
+@NoArgsConstructor
 public class Message {
 
     @Id
@@ -47,8 +49,6 @@ public class Message {
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
-
-    public Message() {}
 
     public Message(User sender, User recipient, Game game, String content) {
         this.sender = sender;

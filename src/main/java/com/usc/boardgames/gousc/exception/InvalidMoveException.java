@@ -1,5 +1,8 @@
 package com.usc.boardgames.gousc.exception;
 
+import lombok.Getter;
+
+@Getter
 public class InvalidMoveException extends Exception {
 
     public enum Reason {
@@ -15,9 +18,5 @@ public class InvalidMoveException extends Exception {
     public InvalidMoveException(Reason reason) {
         super("Invalid move: " + reason);
         this.reason = reason;
-    }
-
-    public Reason getReason() {
-        return reason;
     }
 }
