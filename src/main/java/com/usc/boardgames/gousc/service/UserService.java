@@ -41,11 +41,12 @@ public class UserService {
 
     /**
      * Autenticación sin seguridad de Spring (proyecto de clase): valida
-     * usuario + contraseña en texto plano.
+     * usuario + contraseña en texto plano. Usuario inexistente y contraseña
+     * incorrecta dan el mismo error para no revelar qué usuarios existen.
      */
-    public User login(Credentials credentials) throws UserNotFoundException, InvalidCredentialsException {
+    public User login(Credentials credentials) throws InvalidCredentialsException {
         var user = userRepository.findByUsername(credentials.username())
-                .orElseThrow(() -> new UserNotFoundException(credentials.username()));
+                .orElseThrow(InvalidCredentialsException::new);
         if (credentials.password() == null || !credentials.password().equals(user.getPassword())) {
             throw new InvalidCredentialsException();
         }

@@ -43,7 +43,7 @@ public class UserController {
     @PostMapping(path = "login", produces = MediaType.APPLICATION_JSON_VALUE)
     @JsonView(Views.Public.class)
     public ResponseEntity<User> login(@jakarta.validation.Valid @RequestBody Credentials credentials)
-            throws UserNotFoundException, InvalidCredentialsException {
+            throws InvalidCredentialsException {
         return ResponseEntity.ok(users.login(credentials));
     }
 

@@ -54,14 +54,14 @@ public class GameService {
     public com.usc.boardgames.gousc.model.dto.Game join(Long gameId, User joiner)
             throws GameNotFoundException, GameFullException, GameStateException, UserNotFoundException {
         var game = find(gameId);
+        if (game.getWhitePlayer() != null) {
+            throw new GameFullException(gameId);
+        }
         if (game.getStatus() != GameStatus.WAITING) {
-            throw new GameStateException(gameId, "La partida ya tiene ambos jugadores");
+            throw new GameStateException(gameId, "La partida ya no admite jugadores");
         }
         if (game.getBlackPlayer().getId().equals(joiner.id())) {
             throw new GameStateException(gameId, "Ya eres el jugador de las negras");
-        }
-        if (game.getWhitePlayer() != null) {
-            throw new GameFullException(gameId);
         }
         game.setWhitePlayer(userService.entity(joiner.id()));
         game.setStatus(GameStatus.ACTIVE);

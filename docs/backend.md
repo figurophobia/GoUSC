@@ -24,7 +24,7 @@ seguridad ni atajos de código). Cuatro capas estrictas:
 
 ```mermaid
 flowchart LR
-    C["Cliente HTTP<br/>(frontend futuro / curl)"] --> CTRL
+    C["Cliente HTTP<br/>(frontend static/ / curl)"] --> CTRL
     subgraph App ["Spring Boot - GoUSC"]
         CTRL["controller/<br/>@RestController<br/>HTTP + validación de cabeceras"] --> SVC
         SVC["service/<br/>@Service<br/>lógica de negocio y reglas del Go"] --> REPO
@@ -108,9 +108,9 @@ respuesta (id, identificador, reason…):
 
 | Excepción | Origen | HTTP |
 |-----------|--------|------|
-| `UserNotFoundException` | usuario inexistente (get, login, cabecera…) | 404 |
+| `UserNotFoundException` | usuario inexistente (get, cabecera…) | 404 |
 | `DuplicateUserException` | username ya registrado | 409 |
-| `InvalidCredentialsException` | contraseña incorrecta en login | 401 |
+| `InvalidCredentialsException` | usuario inexistente o contraseña incorrecta en login | 401 |
 | `GameNotFoundException` | partida inexistente | 404 |
 | `GameFullException` | unirse a partida con blancas ya ocupadas | 409 |
 | `GameStateException` | operación en estado inválido (no ACTIVE, no participante, partida terminada…) | 409 |
@@ -136,7 +136,7 @@ Además, `IllegalArgumentException` (p. ej. mandarte una solicitud a ti mismo) �
 |---------|---------------------------|
 | `GoRules.java` (`@Component`) | **Todas las reglas del Go** sobre un `Map<String,String>` (`"3,4" → "B"/"W"`): `placeStone` (rangos, celda ocupada, capturas, suicidio, ko), `groupAndLiberties` (grupo y libertades por *búsqueda*), `calculateTerritory` (territorio por *flood-fill*), `formatCoordinate`/`parseCoordinate` (columnas A–T sin la I). Devuelve los registros `MoveOutcome(board, captures)` y `Group(stones, liberties)`. Ver [§4](#4-reglas-del-go-implementadas). |
 | `EloService.java` (`@Component`) | `deltas(ganador, perdedor)`: ELO clásico con **K = 32**, `round(K × (1 − esperado))`, mínimo 1 punto; la suma es siempre 0. |
-| `UserService.java` | `create` (dup → excepción), `login` (valida usuario+contraseña en claro), `get`, `update` (email/contraseña opcionales), `ranking`, `recordResult` (victoria/derrota + ajuste de ELO), `entity` (recuperar entidad para FKs). |
+| `UserService.java` | `create` (dup → excepción), `login` (valida usuario+contraseña en claro), `get`, `update` (username/email/contraseña opcionales; username 3–50 y único), `ranking`, `recordResult` (victoria/derrota + ajuste de ELO), `entity` (recuperar entidad para FKs). |
 | `GameService.java` | Núcleo del juego, `@Transactional`: `create`, `join` (WAITING→ACTIVE), `leave` (ABANDONED; si había rival en juego, `winner` = rival y ELO si RANKED), `list`/`listAll`/`listByUser`, `get`, **`playMove`** (valida estado/turno, delega los passes, serializa el tablero con Jackson). Privados: `doPass` (2 passes seguidos → `finishGame`), `finishGame` (territorio + komi + ELO), `applyElo`, `colorOf`, serialización JSON↔Map. |
 | `FriendshipService.java` | `request` (rechaza duplicadas en ambos sentidos y a uno mismo), `accept`/`reject` (solo el `addressee` y solo si está `PENDING`), `listFriends` (amigos aceptados), `listPending`. |
 | `MessageService.java` | `sendPrivate` (privado a otro usuario), `sendGame` (solo jugadores y solo si la partida está ACTIVE), `listPrivate`, `listGame`. |
@@ -174,11 +174,11 @@ Además, `IllegalArgumentException` (p. ej. mandarte una solicitud a ti mismo) �
 | Método | Ruta | Cabecera | Body | Éxito | Errores |
 |--------|------|----------|------|-------|---------|
 | POST | `/users` | — | `User` (`username`, `password`, `email?`) | **201** + `Location` | 409 usuario duplicado |
-| POST | `/users/login` | — | `{username, password}` | 200 `User` | 404 sin usuario · 401 contraseña mal |
+| POST | `/users/login` | — | `{username, password}` | 200 `User` | 401 usuario o contraseña incorrectos |
 | GET | `/users?page&size&sort` | — | — | 200 página (`sort`: `-elo`, `username`…) | — |
 | GET | `/users/ranking` | — | — | 200 `List<User>` por ELO desc | — |
 | GET | `/users/{id}` | — | — | 200 `User` | 404 |
-| PUT | `/users/{id}` | — | `User` (con `email` y/o `password`) | 200 `User` actualizado | 404 |
+| PUT | `/users/{id}` | — | `User` (con `username`, `email` y/o `password`) | 200 `User` actualizado | 400 username fuera de 3–50 · 404 · 409 username ya existe |
 
 ```bash
 # Registro
@@ -273,7 +273,7 @@ El estado del tablero se serializa así (columnas del JSON = celdas ocupadas):
 | POST | `/friendships/{id}/reject` | `X-User-Id` | — | 200 (REJECTED) | igual que accept |
 | GET | `/friendships` | `X-User-Id` | — | 200 `List<User>` (amigos) | 404 user |
 | GET | `/friendships/pending` | `X-User-Id` | — | 200 `List<Friendship>` recibidas | 404 user |
-| POST | `/messages?to={id}` | `X-User-Id` | `{content}` | 200 `Message` | 404 |
+| POST | `/messages?to={id}` | `X-User-Id` | `{content}` | 200 `Message` | 404 · 400 a uno mismo |
 | GET | `/messages?with={id}` | `X-User-Id` | — | 200 `List<Message>` cronológico | 404 |
 
 ### 3.4 Errores
@@ -293,7 +293,7 @@ El estado del tablero se serializa así (columnas del JSON = celdas ocupadas):
 | HTTP | Causas |
 |------|--------|
 | **400** | Jugada inválida (`InvalidMoveException`, con `detail` indicando el motivo), `X-User-Id` ausente, parámetro no convertible, `IllegalArgumentException` (p. ej. solicitarte amistad a ti mismo). |
-| **401** | Login con contraseña incorrecta. |
+| **401** | Login con usuario inexistente o contraseña incorrecta (mismo error para no revelar qué usuarios existen). |
 | **404** | Usuario, partida o solicitud de amistad inexistente. |
 | **409** | Username duplicado (+ `Location` del usuario), partida llena, operación en estado inválido, solicitud duplicada/resuelta. |
 
@@ -527,29 +527,25 @@ sequenceDiagram
 | ELO K=32, solo RANKED, suma 0, mínimo 1 | Fórmula estándar; impide partidas amistosas inflando el ranking. |
 | Servicios `@Transactional` | Cada operación de negocio es una transacción atómica (partida + ELO juntos). |
 | Errores `checked` + `ProblemDetail` | Patrón del ejemplo: el detalle del error incluye el id/dato que falló. |
-| Lombok en las entities | `@Getter @Setter` + `@Accessors(chain = true)` ahorran ~400 líneas de accesores. Con JDK 27 hace falta Lombok **1.18.48** (el 1.18.46 que trae Spring Boot 4.1.1 no compila). |
+| Lombok en las entities | `@Getter @Setter` + `@Accessors(chain = true)` ahorran ~400 líneas de accesores. Con JDK 26 hace falta Lombok **1.18.48** (el 1.18.46 que trae Spring Boot 4.1.1 no compila). |
 
 ---
 
 ## 7. Qué queda por hacer
 
-1. **Fase 3 — Probar y pulir el backend**:
-   - Tests automáticos de los endpoints: registro, login, crear partida, unirse, jugar,
-     abandonar, amistades y chat. Ahora mismo solo están testeadas las reglas del Go
-     (`GoRulesTest`).
-   - Validar los datos que llegan del cliente: campos obligatorios, textos no vacíos,
-     límites de valores.
-   - Corregir lo que salga de esas pruebas.
-2. **Fase 4 — Frontend HTML + JavaScript vanilla**: login/registro, lobby de partidas
-   (crear, listar WAITING, unirse), tablero de Go (render de `boardState`, envío de
-   jugadas y passes), ranking, amigos + chat. Todo consumiendo esta API con la cabecera
-   `X-User-Id`.
-3. **Fase 5 — Testear el leaderboard**: tests automáticos del ranking y del ELO:
+Las fases 1–4 (backend, validaciones y frontend en `static/`) están hechas; ver el
+estado en el [README](../README.md#estado-del-proyecto).
+
+1. **Fase 5 — Testear el leaderboard**: tests automáticos del ranking y del ELO:
    simular varias partidas rankeadas y comprobar que la clasificación se ordena bien,
    que los cambios de ELO son los esperados y que victorias/derrotas se acumulan.
-4. **Fase 6 — Despliegue**: publicar el backend con Docker para que el frontend se
+2. **Fase 6 — Despliegue**: publicar el backend con Docker para que el frontend se
    conecte desde cualquier máquina (y no solo desde este ordenador).
-5. **Opcionales**: autenticación real (JWT), partidas y chat en tiempo real (SSE),
+3. **Opcionales**: autenticación real (JWT), partidas y chat en tiempo real (SSE),
    espectadores.
+
+**Limitación conocida:** como el usuario se identifica solo con la cabecera `X-User-Id`,
+cualquier cliente puede hacerse pasar por otro usuario (y, por ejemplo, leer sus chats
+privados). Se resuelve con la autenticación real (JWT) de los opcionales.
 
 Volver al [README](../README.md) · ver el [modelo de datos](database.md).

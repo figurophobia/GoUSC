@@ -743,7 +743,12 @@ async function loadHistory(force) {
 function historyBadge(g, meId) {
     if (g.status === 'WAITING') return { cls: 'wait', text: 'Esperando' };
     if (g.status === 'ACTIVE') return { cls: 'live', text: 'En curso' };
-    if (g.status === 'ABANDONED') return { cls: 'off', text: 'Abandonada' };
+    if (g.status === 'ABANDONED') {
+        if (!g.winner) return { cls: 'off', text: 'Abandonada' };
+        return g.winner.id === meId
+            ? { cls: 'win', text: 'Victoria (abandono)' }
+            : { cls: 'loss', text: 'Derrota (abandono)' };
+    }
     if (g.status === 'FINISHED') {
         if (!g.winner) return { cls: 'off', text: 'Sin resultado' };
         return g.winner.id === meId
@@ -907,26 +912,35 @@ function renderPlayer(id, game, color, label) {
         ${isTurn ? `<span class="turnTag">${mine ? 'Tu turno' : 'Turno'}</span>` : ''}`;
 }
 
+function myEloDelta(game) {
+    if (game.mode !== 'RANKED') return null;
+    const mine = myColor(game);
+    if (mine === 'BLACK') return game.eloChangeBlack;
+    if (mine === 'WHITE') return game.eloChangeWhite;
+    return null;
+}
+
+function eloLine(delta) {
+    if (delta == null) return '';
+    return `<div class="resultElo">Tu ELO: <span class="${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '+' : ''}${delta}</span></div>`;
+}
+
 function renderGameResult(game) {
     const box = $('gameResult');
     if (game.status === 'FINISHED') {
-        const myDelta = (() => {
-            if (game.mode !== 'RANKED') return null;
-            const mine = myColor(game);
-            if (mine === 'BLACK') return game.eloChangeBlack;
-            if (mine === 'WHITE') return game.eloChangeWhite;
-            return null;
-        })();
         box.style.display = 'block';
         box.innerHTML = `
             <div class="resultTitle">${game.winner ? `Ganador: ${esc(game.winner.username)}` : 'Partida finalizada'}</div>
             <div class="resultLine"><span>Negras</span><strong>${game.finalScoreBlack != null ? game.finalScoreBlack : '—'}</strong></div>
             <div class="resultLine"><span>Blancas</span><strong>${game.finalScoreWhite != null ? game.finalScoreWhite : '—'}</strong></div>
-            ${myDelta != null ? `<div class="resultElo">Tu ELO: <span class="${myDelta >= 0 ? 'up' : 'down'}">${myDelta >= 0 ? '+' : ''}${myDelta}</span></div>` : ''}`;
+            ${eloLine(myEloDelta(game))}`;
     } else if (game.status === 'ABANDONED') {
         box.style.display = 'block';
-        box.innerHTML = `<div class="resultTitle">Partida abandonada</div>
-            <div class="resultLine"><span>Estado</span><strong>No se contabiliza</strong></div>`;
+        box.innerHTML = game.winner
+            ? `<div class="resultTitle">Ganador por abandono: ${esc(game.winner.username)}</div>
+               ${eloLine(myEloDelta(game))}`
+            : `<div class="resultTitle">Partida abandonada</div>
+               <div class="resultLine"><span>Estado</span><strong>No se contabiliza</strong></div>`;
     } else {
         box.style.display = 'none';
         box.innerHTML = '';

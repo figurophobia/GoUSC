@@ -17,8 +17,8 @@ controller → service → repository → entity, DTOs como *records* y errores 
 | 5 | Testear el leaderboard: tests automáticos del ranking y de los cambios de ELO | ⬜ Pendiente |
 | 6 | Despliegue: publicar el backend (Docker) para que el frontend se conecte desde cualquier máquina | ⬜ Pendiente |
 
-**Comprobaciones actuales:** `./mvnw test` → 11/11 tests OK (9 de reglas del Go +
-carga de contexto con BD real + smoke test). Prueba manual E2E de todos los endpoints
+**Comprobaciones actuales:** `./mvnw test` → 10/10 tests OK (9 de reglas del Go +
+carga de contexto con BD real). Prueba manual E2E de todos los endpoints
 verificada y test end-to-end de navegador (Chrome CDP) con 41 comprobaciones OK:
 navegación entre vistas, edición de perfil, actualización automática de lobby/ranking/
 amigos/chats, snap del tablero, avisos, login, responsive móvil y 0 errores de consola.
@@ -76,7 +76,7 @@ Autenticación: sin spring-security. El cliente identifica al usuario con la cab
 | Método | Ruta | Qué hace |
 |--------|------|----------|
 | POST | `/users` | Registro (201 + `Location`) |
-| POST | `/users/login` | Login por usuario+contraseña |
+| POST | `/users/login` | Login por usuario+contraseña (401 si no coinciden) |
 | GET | `/users?page&size&sort` | Listado paginado |
 | GET | `/users/ranking` | Clasificación por ELO |
 | GET / PUT | `/users/{id}` | Consulta / actualización (nombre, email, contraseña) |
@@ -156,7 +156,7 @@ Errores en formato `application/problem+json` (`type`, `title`, `detail`, `statu
   `FriendshipController`: la contraseña **ya no se filtra** en respuestas como
   `GET /games` o `GET /friendships/pending` (antes salía en claro).
 
-**Verificación:** `./mvnw test` → 11/11 OK; test E2E de navegador (Chrome headless + CDP)
+**Verificación:** `./mvnw test` → 10/10 OK; test E2E de navegador (Chrome headless + CDP)
 → 41/41 comprobaciones y 0 errores de consola; sin scroll horizontal en móvil.
 
 ### Iteración anterior — Fase 3 y 4

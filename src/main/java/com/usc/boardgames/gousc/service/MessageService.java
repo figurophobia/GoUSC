@@ -35,6 +35,9 @@ public class MessageService {
             throws UserNotFoundException {
         var senderEntity = userService.entity(sender.id());
         var recipientEntity = userService.entity(recipientId);
+        if (senderEntity.getId().equals(recipientEntity.getId())) {
+            throw new IllegalArgumentException("No puedes enviarte un mensaje a ti mismo");
+        }
         var message = new com.usc.boardgames.gousc.model.entity.Message(
                 senderEntity, recipientEntity, null, content);
         return Message.from(messageRepository.save(message));
