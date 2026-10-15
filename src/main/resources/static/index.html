@@ -42,7 +42,8 @@
         <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
         <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></symbol>
         <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
-        <symbol id="i-scroll"viewBox="0 0 24 24"><path d="M7 4h11a2 2 0 0 1 2 2v1h-4M7 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7M7 4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2M10 10h5M10 14h5"/></symbol>
+        <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6.5C10.5 5 8 4.5 4 4.5v13c4 0 6.5.5 8 2 1.5-1.5 4-2 8-2v-13c-4 0-6.5.5-8 2Z"/><path d="M12 6.5v13"/></symbol>
+        <symbol id="i-scroll" viewBox="0 0 24 24"><path d="M7 4h11a2 2 0 0 1 2 2v1h-4M7 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7M7 4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2M10 10h5M10 14h5"/></symbol>
     </svg>
 
     <div id="app">
@@ -124,6 +125,7 @@
                         <button class="navBtn" data-view="rankingView" type="button"><svg class="ic"><use href="#i-trophy"/></svg><span>Ranking</span></button>
                         <button class="navBtn" data-view="friendsView" type="button"><svg class="ic"><use href="#i-users"/></svg><span>Amigos</span><span class="navBadge" id="pendingBadge" hidden>0</span></button>
                         <button class="navBtn" data-view="chatView" type="button"><svg class="ic"><use href="#i-chat"/></svg><span>Chat</span></button>
+                        <button class="navBtn" data-view="learnView" type="button"><svg class="ic"><use href="#i-book"/></svg><span>Aprender</span></button>
                     </nav>
 
                     <div class="topActions">
@@ -185,6 +187,11 @@
                                     <button class="linkBtn" data-goto="rankingView" type="button">Ver todo</button>
                                 </header>
                                 <ol class="miniRank" id="sideTop"></ol>
+                            </section>
+                            <section class="panel learnPromo">
+                                <h3 class="panelTitle panelTitleSm"><svg class="ic"><use href="#i-book"/></svg> ¿Nuevo en el Go?</h3>
+                                <p class="muted small">Aprende las reglas en 11 lecciones cortas e interactivas: libertades, capturas, ko, ojos y territorio.</p>
+                                <button class="btn btnGhost btnSm btnBlock" data-goto="learnView" type="button">Empezar el tutorial</button>
                             </section>
                             <section class="panel proverb">
                                 <span class="proverbMark" aria-hidden="true">諺</span>
@@ -329,6 +336,40 @@
                                 <button type="submit" id="saveProfileBtn" class="btn btnPrimary">Guardar cambios</button>
                             </form>
                         </section>
+                    </div>
+                </section>
+
+                <!-- --------------------------------------------------- APRENDER -->
+                <section id="learnView" class="view">
+                    <div class="learnLayout">
+                        <aside class="panel learnIndex">
+                            <header class="panelHead">
+                                <h2 class="panelTitle panelTitleSm"><svg class="ic"><use href="#i-book"/></svg> Aprende a jugar</h2>
+                                <span class="panelSub" id="learnProgress">-</span>
+                            </header>
+                            <ol class="lessonList" id="lessonList"></ol>
+                        </aside>
+
+                        <div class="boardCol">
+                            <div class="boardFrame" id="learnFrame">
+                                <canvas id="learnBoard" width="640" height="640"></canvas>
+                            </div>
+                        </div>
+
+                        <aside class="learnSide">
+                            <section class="panel lessonCard">
+                                <span class="lessonKicker" id="lessonKicker">-</span>
+                                <h1 class="lessonTitle" id="lessonTitle">-</h1>
+                                <div class="lessonText" id="lessonText"></div>
+                                <div class="lessonTask" id="lessonTask"></div>
+                                <div class="lessonFeedback" id="lessonFeedback" hidden></div>
+                                <div class="lessonNav">
+                                    <button id="lessonPrev" class="btn btnGhost btnSm" type="button"><svg class="ic"><use href="#i-back"/></svg><span>Anterior</span></button>
+                                    <button id="lessonReset" class="btn btnGhost btnSm" type="button" title="Reiniciar la lección"><svg class="ic"><use href="#i-refresh"/></svg><span>Reiniciar</span></button>
+                                    <button id="lessonNext" class="btn btnGhost btnSm" type="button"><span>Siguiente</span></button>
+                                </div>
+                            </section>
+                        </aside>
                     </div>
                 </section>
 

@@ -1,0 +1,47 @@
+# Despliegue completo de GoUSC: base de datos + aplicación (backend y frontend).
+#
+#   docker compose -f compose.prod.yaml up -d --build
+#
+# Después se abre http://<IP-de-esta-máquina>:8080 desde cualquier navegador de la red.
+# Guía completa: docs/deploy.md
+#
+# (compose.yaml es otro fichero: solo la base de datos para desarrollar con ./mvnw spring-boot:run)
+
+name: gousc-prod
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gousc}
+      POSTGRES_USER: ${POSTGRES_USER:-gousc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gousc}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Sin "ports": la base de datos solo es accesible desde la red interna de
+    # Docker (desde el contenedor app), no desde fuera de la máquina.
+
+  app:
+    build: .
+    image: gousc:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Spring lee estas variables en lugar de los valores de application.properties
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-gousc}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-gousc}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-gousc}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75}
+    ports:
+      - "${GOUSC_PORT:-8080}:8080"
+
+volumes:
+  pgdata:

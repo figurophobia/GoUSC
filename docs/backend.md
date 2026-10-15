@@ -3,7 +3,7 @@
 Documentación exhaustiva del backend: arquitectura por capas, qué hace **cada archivo**,
 API REST completa con ejemplos, reglas del Go y **diagramas de funcionamiento**.
 
-> Otros documentos: [Diseño de la base de datos](database.md) · [README del proyecto](../README.md)
+> Otros documentos: [Diseño de la base de datos](database.md) · [Despliegue con Docker](deploy.md) · [README del proyecto](../README.md)
 
 ## Índice
 
@@ -538,6 +538,7 @@ sequenceDiagram
 | Enums como `STRING` | Valores legibles en la BD y en la API. |
 | ELO K=32, solo RANKED, suma 0, mínimo 1 | Fórmula estándar; impide partidas amistosas inflando el ranking. |
 | Servicios `@Transactional` | Cada operación de negocio es una transacción atómica (partida + ELO juntos). |
+| `spring.jpa.open-in-view=false` | Los servicios convierten las entidades a DTO dentro de su transacción, así que no hace falta mantener la sesión JPA abierta durante la respuesta HTTP. |
 | Errores `checked` + `ProblemDetail` | Patrón del ejemplo: el detalle del error incluye el id/dato que falló. |
 | Lombok en entities, servicios, controladores y excepciones | `@Getter @Setter @NoArgsConstructor` + `@Accessors(chain = true)` en las entities, `@RequiredArgsConstructor` para la inyección y `@Getter` en las excepciones ahorran cientos de líneas repetitivas. Con JDK 26 hace falta Lombok **1.18.48** (el 1.18.46 que trae Spring Boot 4.1.1 no compila). |
 
@@ -545,13 +546,13 @@ sequenceDiagram
 
 ## 7. Qué queda por hacer
 
-Las fases 1–5 (backend, validaciones, frontend en `static/` y tests del leaderboard) están hechas; ver el
-estado en el [README](../README.md#estado-del-proyecto).
+Las seis fases del plan están hechas (el despliegue con Docker se explica en
+[deploy.md](deploy.md)); ver el estado en el [README](../README.md#estado-del-proyecto).
+Mejoras opcionales:
 
-1. **Fase 6 — Despliegue**: publicar el backend con Docker para que el frontend se
-   conecte desde cualquier máquina (y no solo desde este ordenador).
-2. **Opcionales**: autenticación real (JWT), partidas y chat en tiempo real (SSE),
-   espectadores.
+1. **Opcionales**: autenticación real (JWT) con contraseñas cifradas (BCrypt) y HTTPS,
+   partidas y chat en tiempo real (WebSockets/SSE), reloj de partida y publicar la imagen
+   en GHCR con GitHub Actions.
 
 **Limitación conocida:** como el usuario se identifica solo con la cabecera `X-User-Id`,
 cualquier cliente puede hacerse pasar por otro usuario (y, por ejemplo, leer sus chats

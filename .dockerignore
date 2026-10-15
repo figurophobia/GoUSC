@@ -1,0 +1,13 @@
+# Solo se envía a Docker lo necesario para compilar (mvnw, .mvn, pom.xml y src).
+target/
+.git/
+.idea/
+.vscode/
+*.iml
+docs/
+*.md
+.env
+.env.*
+compose*.yaml
+Dockerfile
+.dockerignore

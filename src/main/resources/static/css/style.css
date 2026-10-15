@@ -8,7 +8,7 @@
     3. Tipografía y utilidades     11. Amigos
     4. Botones                     12. Chat
     5. Formularios                 13. Perfil
-    6. Marca, chips, avatares      14. Partida
+    6. Marca, chips, avatares      14. Partida (14b. Aprender)
     7. Acceso (login)              15. Toasts
     8. Cabecera y paneles          16. Responsive
    ========================================================================== */
@@ -1306,6 +1306,103 @@ input:focus {
 .resultElo.up { color: var(--good); }
 .resultElo.down { color: var(--bad); }
 
+/* --------------------------------------------------------- 14b. Aprender -- */
+.learnLayout {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr) 330px;
+    gap: 18px;
+    align-items: start;
+}
+#learnBoard {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.learnIndex { padding: 16px 10px 10px; }
+.learnIndex .panelHead { padding: 0 8px; }
+.lessonList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.lessonItem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px;
+    border-radius: var(--r-sm);
+    color: var(--text-2);
+    font-size: 13.5px;
+    font-weight: 600;
+    text-align: left;
+    transition: background .15s, color .15s;
+}
+.lessonItem:hover { background: var(--hover); color: var(--text); }
+.lessonItem.active { background: var(--accent-soft); color: var(--text); }
+.lessonNum {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--panel-3);
+    color: var(--text-3);
+    font-size: 12px;
+    font-weight: 700;
+}
+.lessonNum .ic { width: 14px; height: 14px; }
+.lessonItem.active .lessonNum { background: var(--accent); color: var(--seal-ink); }
+.lessonItem.done .lessonNum { background: var(--good-soft); color: var(--good); }
+.lessonItem.active.done .lessonNum { background: var(--good); color: #fff; }
+.lessonName { min-width: 0; }
+
+.lessonCard { display: flex; flex-direction: column; gap: 12px; }
+.lessonKicker { font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.lessonTitle { margin: -6px 0 0; font: 800 24px/1.2 var(--font-display); }
+.lessonText { color: var(--text-2); font-size: 14px; line-height: 1.6; }
+.lessonText p { margin: 0 0 10px; }
+.lessonText p:last-child, .lessonText ul:last-child { margin-bottom: 0; }
+.lessonText ul { margin: 0 0 10px; padding-left: 18px; }
+.lessonText li { margin-bottom: 6px; }
+.lessonText b { color: var(--text); }
+.lessonTask {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border-radius: var(--r);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    font-size: 14px;
+    line-height: 1.5;
+}
+.lessonTask .stone { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+.lessonFeedback {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 11px 12px;
+    border-radius: var(--r);
+    font-size: 13.5px;
+    line-height: 1.5;
+    animation: fadeUp .2s var(--ease);
+}
+.lessonFeedback[hidden] { display: none; }
+.lessonFeedback .ic { flex: none; width: 17px; height: 17px; margin-top: 1px; }
+.lessonFeedback b { color: var(--text); }
+.lessonFeedback--good { background: var(--good-soft); color: var(--text); }
+.lessonFeedback--good .ic { color: var(--good); }
+.lessonFeedback--bad { background: var(--bad-soft); color: var(--text); }
+.lessonFeedback--bad .ic { color: var(--bad); }
+.lessonFeedback--info { background: var(--info-soft); color: var(--text); }
+.lessonFeedback--info .ic { color: var(--info); }
+.lessonNav { display: flex; gap: 8px; }
+.lessonNav .btn { flex: 1; padding: 0 8px; }
+
+.learnPromo p { margin: 8px 0 12px; }
+
 /* ----------------------------------------------------------- 15. Toasts -- */
 .toastContainer {
     position: fixed;
@@ -1350,6 +1447,9 @@ input:focus {
 @media (max-width: 1180px) {
     .gameLayout { grid-template-columns: minmax(0, 1fr) 300px; }
     .gameChat { grid-column: 1 / -1; order: 3; height: 340px; }
+    .learnLayout { grid-template-columns: minmax(0, 1fr) 320px; }
+    .learnIndex { grid-column: 1 / -1; order: 3; }
+    .lessonList { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 }
 
 @media (max-width: 980px) {
@@ -1364,7 +1464,7 @@ input:focus {
 }
 
 @media (max-width: 820px) {
-    .gameLayout { grid-template-columns: 1fr; }
+    .gameLayout, .learnLayout { grid-template-columns: 1fr; }
     .boardFrame { max-width: 100%; }
     .gameSide { order: 2; }
     .gameChat { order: 3; }

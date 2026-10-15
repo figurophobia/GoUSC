@@ -407,11 +407,11 @@ const Board = (() => {
     }
 
     /**
-     * opts: { px, dpr, size, board, last, ghost, ghostColor, coords, padRatio }
+     * opts: { px, dpr, size, board, last, ghost, ghostColor, coords, padRatio, marks }
      * board: objeto { "x,y": "B" | "W" } tal y como lo guarda el backend.
      */
     function draw(ctx, opts) {
-        const { px, dpr = 1, size, board = {}, last = null, ghost = null, ghostColor = 'B', coords = true } = opts;
+        const { px, dpr = 1, size, board = {}, last = null, ghost = null, ghostColor = 'B', coords = true, marks = [] } = opts;
         const padRatio = opts.padRatio != null ? opts.padRatio : (coords ? 1.05 : 0.7);
         const m = metrics(px, size, padRatio);
         const end = m.pad + (size - 1) * m.cell;
@@ -479,6 +479,41 @@ const Board = (() => {
             ctx.stroke();
         }
 
+        // marcas del tutorial: libertades, territorio, objetivo y jugada rechazada
+        for (const mk of marks) {
+            const [cx, cy] = toPx(mk.x, mk.y, size, m);
+            ctx.beginPath();
+            if (mk.type === 'lib') {
+                ctx.arc(cx, cy, r * 0.24, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(56, 142, 60, .9)';
+                ctx.fill();
+            } else if (mk.type === 'terrB' || mk.type === 'terrW') {
+                const s = r * 0.62;
+                ctx.rect(cx - s / 2, cy - s / 2, s, s);
+                ctx.fillStyle = mk.type === 'terrB' ? 'rgba(18, 18, 20, .85)' : 'rgba(255, 253, 248, .95)';
+                ctx.fill();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = 'rgba(46, 26, 8, .55)';
+                ctx.stroke();
+            } else if (mk.type === 'target') {
+                ctx.arc(cx, cy, r * 0.62, 0, Math.PI * 2);
+                ctx.setLineDash([r * 0.22, r * 0.16]);
+                ctx.lineWidth = Math.max(1.5, r * 0.12);
+                ctx.strokeStyle = '#d0473b';
+                ctx.stroke();
+                ctx.setLineDash([]);
+            } else if (mk.type === 'x') {
+                const s = r * 0.42;
+                ctx.moveTo(cx - s, cy - s); ctx.lineTo(cx + s, cy + s);
+                ctx.moveTo(cx + s, cy - s); ctx.lineTo(cx - s, cy + s);
+                ctx.lineWidth = Math.max(2, r * 0.16);
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = '#d0473b';
+                ctx.stroke();
+                ctx.lineCap = 'butt';
+            }
+        }
+
         if (ghost && !board[ghost.x + ',' + ghost.y]) {
             const [cx, cy] = toPx(ghost.x, ghost.y, size, m);
             stone(ctx, cx, cy, r, ghostColor, 0.5, 0);
@@ -508,7 +543,12 @@ const Board = (() => {
         return { x, y };
     }
 
-    return { draw, pick, parseCoord };
+    /** {x: 3, y: 3} -> "D4". */
+    function formatCoord(x, y) {
+        return COLS[x] + (y + 1);
+    }
+
+    return { draw, pick, parseCoord, formatCoord };
 })();
 
 /* ======================================================= tema y sonido === */
@@ -660,6 +700,7 @@ function switchView(viewId) {
     if (viewId === 'friendsView') loadFriends(true);
     if (viewId === 'chatView') openChatView();
     if (viewId === 'profileView') loadProfile();
+    if (viewId === 'learnView') openLearnView();
 }
 
 document.querySelectorAll('.navBtn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
@@ -1637,6 +1678,565 @@ function drawHero() {
     [[2, 6], [3, 6], [2, 4], [3, 3], [6, 2], [5, 3], [6, 6], [4, 2], [2, 2]].forEach(([x, y]) => { b[x + ',' + y] = 'B'; });
     [[6, 5], [5, 6], [4, 5], [5, 4], [4, 4], [6, 3], [3, 5], [7, 4]].forEach(([x, y]) => { b[x + ',' + y] = 'W'; });
     Board.draw(hero.getContext('2d'), { px, dpr, size: 9, board: b, last: { x: 4, y: 4 }, coords: false });
+}
+
+/* =========================================================== aprender ===== */
+
+/**
+ * Reglas del Go en el cliente, con la misma lógica que GoRules en el backend
+ * (captura, suicidio, ko y territorio). Solo las usa el tutorial: las partidas
+ * reales siempre las valida el servidor.
+ */
+const LocalGo = {
+    neighbors(x, y, size) {
+        return [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]
+            .filter(([a, b]) => a >= 0 && b >= 0 && a < size && b < size);
+    },
+
+    /** Grupo de la piedra en (x, y): sus piedras y sus libertades ("x,y"). */
+    group(board, x, y, size) {
+        const color = board[x + ',' + y];
+        const stones = [];
+        const libs = new Set();
+        const seen = new Set([x + ',' + y]);
+        const stack = [[x, y]];
+        while (stack.length) {
+            const [cx, cy] = stack.pop();
+            stones.push([cx, cy]);
+            for (const [nx, ny] of this.neighbors(cx, cy, size)) {
+                const k = nx + ',' + ny;
+                if (!board[k]) libs.add(k);
+                else if (board[k] === color && !seen.has(k)) { seen.add(k); stack.push([nx, ny]); }
+            }
+        }
+        return { stones, libs };
+    },
+
+    /** Devuelve { board, captured } o { error: 'OCCUPIED' | 'SUICIDE' | 'KO' }. */
+    play(board, size, color, x, y, previous) {
+        const k = x + ',' + y;
+        if (board[k]) return { error: 'OCCUPIED' };
+        const next = { ...board, [k]: color };
+        const enemy = color === 'B' ? 'W' : 'B';
+        const captured = new Set();
+        for (const [nx, ny] of this.neighbors(x, y, size)) {
+            if (next[nx + ',' + ny] !== enemy || captured.has(nx + ',' + ny)) continue;
+            const g = this.group(next, nx, ny, size);
+            if (!g.libs.size) g.stones.forEach(([a, b]) => captured.add(a + ',' + b));
+        }
+        if (!captured.size && !this.group(next, x, y, size).libs.size) return { error: 'SUICIDE' };
+        captured.forEach(c => delete next[c]);
+        if (previous && this.same(next, previous)) return { error: 'KO' };
+        return { board: next, captured: captured.size };
+    },
+
+    same(a, b) {
+        const ka = Object.keys(a);
+        return ka.length === Object.keys(b).length && ka.every(k => a[k] === b[k]);
+    },
+
+    /** Territorio: regiones vacías que solo tocan piedras de un color. */
+    territory(board, size) {
+        const result = { B: [], W: [] };
+        const seen = new Set();
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                const start = x + ',' + y;
+                if (board[start] || seen.has(start)) continue;
+                const region = [];
+                const owners = new Set();
+                const stack = [[x, y]];
+                seen.add(start);
+                while (stack.length) {
+                    const [cx, cy] = stack.pop();
+                    region.push([cx, cy]);
+                    for (const [nx, ny] of this.neighbors(cx, cy, size)) {
+                        const k = nx + ',' + ny;
+                        if (board[k]) owners.add(board[k]);
+                        else if (!seen.has(k)) { seen.add(k); stack.push([nx, ny]); }
+                    }
+                }
+                if (owners.size === 1) result[[...owners][0]].push(...region);
+            }
+        }
+        return result;
+    }
+};
+
+/*
+ * Lecciones. Cada una tiene una posición inicial (setup) y una lista de pasos.
+ * Un paso indica el color que juega, las jugadas que acepta (o 'any'), y opcionalmente:
+ *   expect: la lección consiste en intentar una jugada ilegal ('SUICIDE' o 'KO').
+ *   reply:  jugadas candidatas con las que responde el otro color.
+ *   wrong:  mensajes para jugadas concretas que no son la buscada.
+ * Las lecciones con `free` son de juego libre: N piedras alternando colores.
+ */
+const LESSONS = [
+    {
+        title: 'El tablero y las piedras',
+        text: `<p>El Go se juega en las <b>intersecciones</b> de las líneas, no dentro de los cuadrados.
+            El tablero oficial es de 19×19; en GoUSC también hay 9×9 y 13×13, ideales para aprender.</p>
+            <p><b>Negro empieza</b> y los jugadores se turnan colocando <b>una piedra</b> cada vez.
+            Una piedra <b>no se mueve</b> nunca: solo sale del tablero si la capturan.</p>
+            <p>El objetivo es <b>rodear más territorio</b> que el rival.</p>`,
+        free: 4,
+        task: 'Coloca cuatro piedras donde quieras. Negras y blancas se alternan.',
+        done: 'Así se juega una piedra. En tu turno también puedes <b>pasar</b> en lugar de colocar.'
+    },
+    {
+        title: 'Libertades',
+        text: `<p>Las <b>libertades</b> de una piedra son las intersecciones vacías <b>pegadas</b> a ella en horizontal
+            o vertical (las diagonales no cuentan). Los puntos verdes las marcan.</p>
+            <p>En el centro una piedra tiene 4 libertades, en el borde 3 y en la esquina solo 2:
+            por eso las piedras del borde son más fáciles de atrapar.</p>`,
+        setup: { B: 'E5 J5 A1' },
+        showLibs: 'B',
+        steps: [{
+            color: 'W', accept: ['E6', 'E4', 'D5', 'F5'],
+            task: 'Juega con blancas en una libertad de la piedra negra del centro.',
+            hint: 'Busca uno de los cuatro puntos verdes que rodean E5.'
+        }],
+        done: 'La piedra del centro ha pasado de 4 a 3 libertades. Quitar libertades es la forma de atacar.'
+    },
+    {
+        title: 'Capturar',
+        text: `<p>Cuando una piedra se queda <b>sin libertades</b> queda <b>capturada</b>: se retira del tablero
+            y cuenta como <b>prisionero</b>, un punto más para quien la captura.</p>`,
+        setup: { B: 'E6 D5 F5', W: 'E5' },
+        showLibs: 'W',
+        steps: [{
+            color: 'B', accept: ['E4'],
+            task: 'La piedra blanca solo tiene una libertad. Captúrala con negras.',
+            hint: 'Juega en la última libertad de la piedra blanca (el punto verde).'
+        }],
+        done: '¡Capturada! Cada prisionero vale un punto al final de la partida.'
+    },
+    {
+        title: 'Grupos',
+        text: `<p>Las piedras del mismo color <b>unidas en línea</b> (no en diagonal) forman un <b>grupo</b>:
+            comparten sus libertades y viven o mueren juntas.</p>
+            <p>Para capturar un grupo hay que quitarle <b>todas</b> sus libertades.</p>`,
+        setup: { B: 'D6 E6 C5 F5 D4', W: 'D5 E5' },
+        showLibs: 'W',
+        steps: [{
+            color: 'B', accept: ['E4'],
+            task: 'Captura las dos piedras blancas de una sola vez.',
+            hint: 'Las dos blancas comparten una única libertad.'
+        }],
+        done: '¡Dos prisioneros de golpe! Cuanto más grande es un grupo, más duele perderlo.'
+    },
+    {
+        title: 'Atari: escapar',
+        text: `<p>Un grupo con <b>una sola libertad</b> está en <b>atari</b>: si el rival juega ahí, lo captura.</p>
+            <p>Cuando te hacen atari, lo normal es <b>alargarte</b> por esa libertad para conseguir más.</p>`,
+        setup: { B: 'E5', W: 'E6 D5 F5' },
+        showLibs: 'B',
+        steps: [{
+            color: 'B', accept: ['E4'],
+            task: 'Tu piedra negra está en atari. Sálvala.',
+            hint: 'Alarga la piedra por su única libertad.'
+        }],
+        done: 'Ahora tu grupo tiene 3 libertades y ya no está en peligro inmediato.'
+    },
+    {
+        title: 'Prohibido el suicidio',
+        text: `<p>No puedes jugar en un punto donde tu piedra se quedaría <b>sin libertades</b>:
+            sería un <b>suicidio</b> y está prohibido.</p>`,
+        setup: { W: 'E6 D5 F5 E4' },
+        steps: [{
+            color: 'B', expect: 'SUICIDE', accept: ['E5'], target: 'E5',
+            task: 'Intenta jugar con negras en el punto marcado (E5).',
+            hint: 'Prueba en E5, el punto rodeado por las blancas.'
+        }],
+        done: 'No se puede: la piedra no tendría ninguna libertad. GoUSC rechaza esa jugada en las partidas igual que aquí.'
+    },
+    {
+        title: 'Capturar va primero',
+        text: `<p>Hay una excepción al suicidio: si al jugar <b>capturas</b> piedras rivales, la jugada es legal,
+            porque al retirarlas tu piedra gana libertades.</p>`,
+        setup: { B: 'A3 B2 C1', W: 'A2 B1' },
+        showLibs: 'W',
+        steps: [{
+            color: 'B', accept: ['A1'],
+            task: 'Captura las dos piedras blancas de la esquina.',
+            hint: 'Las dos blancas comparten su última libertad en la esquina.'
+        }],
+        done: 'La piedra en A1 parecía no tener libertades, pero al capturar se quedó con dos.'
+    },
+    {
+        title: 'La regla del ko',
+        text: `<p>A veces los dos jugadores podrían capturarse una piedra el uno al otro para siempre.
+            Para evitarlo existe el <b>ko</b>: no puedes hacer una jugada que deje el tablero
+            <b>igual que estaba antes</b> de la última jugada de tu rival.</p>
+            <p>Hay que jugar antes en otro sitio y, si el rival no cierra el ko, recapturar después.</p>`,
+        setup: { B: 'E6 D5 E4', W: 'F6 E5 G5 F4' },
+        steps: [
+            {
+                color: 'B', accept: ['F5'],
+                task: 'Captura con negras la piedra blanca en atari.',
+                hint: 'La piedra blanca de E5 solo tiene una libertad.',
+                ok: 'Capturada. Ahora juegas tú con blancas.'
+            },
+            {
+                color: 'W', expect: 'KO', accept: ['E5'], target: 'E5',
+                task: 'Con blancas, intenta recapturar en seguida en E5.',
+                hint: 'Prueba a recapturar en E5.',
+                ok: 'Recapturar ahora repetiría la posición. Primero hay que jugar en otro sitio.'
+            },
+            {
+                color: 'W', accept: 'any', reply: ['C2', 'G2', 'C8', 'G8', 'B5', 'H5'],
+                task: 'Juega con blancas en cualquier otro punto del tablero.',
+                ok: 'Negro ha respondido en otro sitio sin cerrar el ko.'
+            },
+            {
+                color: 'W', accept: ['E5'], target: 'E5',
+                task: 'Ahora sí: recaptura en E5.',
+                hint: 'Recaptura la piedra negra en E5.'
+            }
+        ],
+        done: 'Ahora es negro quien tiene que esperar un turno. Un ko puede alargarse mucho: lo gana quien tenga más amenazas.'
+    },
+    {
+        title: 'Dos ojos: grupos vivos',
+        text: `<p>Un <b>ojo</b> es un punto vacío rodeado por tus piedras. Un grupo con <b>dos ojos separados</b>
+            está <b>vivo</b> para siempre: el rival no puede jugar en ninguno (sería suicidio),
+            así que nunca podrá quitarle la última libertad.</p>
+            <p>Un grupo con un solo ojo, en cambio, acaba capturado.</p>`,
+        setup: { B: 'A2 B2 C2 D2 E2 A1 E1', W: 'A3 B3 C3 D3 E3 F3 F2 F1' },
+        steps: [
+            {
+                color: 'B', accept: ['C1'],
+                task: 'El grupo negro tiene un hueco de tres puntos. Juega donde lo dividas en dos ojos.',
+                hint: 'El punto clave es el centro del hueco.',
+                wrong: {
+                    B1: 'Así queda un solo ojo de dos puntos y blanco podría matar el grupo. Busca el punto que lo divide en dos.',
+                    D1: 'Así queda un solo ojo de dos puntos y blanco podría matar el grupo. Busca el punto que lo divide en dos.'
+                },
+                ok: 'Dos ojos: B1 y D1. Ahora juegas tú con blancas.'
+            },
+            {
+                color: 'W', expect: 'SUICIDE', accept: ['B1', 'D1'],
+                task: 'Con blancas, intenta jugar dentro de uno de los ojos negros.',
+                hint: 'Prueba en B1 o en D1.'
+            }
+        ],
+        done: 'Imposible: cada ojo es un suicidio para blanco. Este grupo negro ya no se puede capturar.'
+    },
+    {
+        title: 'Territorio y final',
+        text: `<p>Cuando ya no se puede ganar nada más, los dos jugadores <b>pasan</b>.
+            Con <b>dos pases seguidos</b> la partida termina y cada uno suma:</p>
+            <ul>
+                <li><b>Territorio</b>: puntos vacíos rodeados solo por tus piedras (los cuadraditos).</li>
+                <li><b>Prisioneros</b>: las piedras que has capturado.</li>
+                <li><b>Komi</b>: blanco suma 6,5 puntos por empezar segundo; el medio punto evita empates.</li>
+            </ul>
+            <p>Si una zona toca piedras de los dos colores, no cuenta para nadie. En GoUSC las piedras muertas
+            no se retiran solas: captúralas antes de pasar.</p>`,
+        setup: { B: 'E1 E2 E3 E4 E6 E7 E8 E9', W: 'F1 F2 F3 F4 F5 F6 F7 F8 F9' },
+        showTerritory: true,
+        steps: [{
+            color: 'B', accept: ['E5'], target: 'E5',
+            task: 'Hay un hueco en el muro negro y la zona de la izquierda no es de nadie. Ciérralo.',
+            hint: 'El hueco está en E5.'
+        }],
+        done: (ls) => {
+            const t = LocalGo.territory(ls.board, 9);
+            const b = t.B.length;
+            const w = t.W.length + 6.5;
+            const fmt = (n) => String(n).replace('.', ',');
+            return `Negro: <b>${b}</b> de territorio. Blanco: <b>${t.W.length}</b> + 6,5 de komi = <b>${fmt(w)}</b>.
+                Gana ${b > w ? 'negro' : 'blanco'} por ${fmt(Math.abs(b - w))} puntos.`;
+        }
+    },
+    {
+        title: 'Consejos para empezar',
+        text: `<ul>
+                <li><b>Esquinas, lados y centro</b>, por ese orden: en las esquinas se rodea territorio con menos piedras.</li>
+                <li><b>Cuida las libertades</b> de tus grupos y conecta las piedras que estén en peligro.</li>
+                <li><b>No persigas cada piedra</b>: a veces vale más hacer territorio que capturar.</li>
+                <li><b>Pasa</b> cuando no quede nada útil por jugar; con dos pases seguidos se cuenta.</li>
+                <li>Empieza con partidas <b>9×9 Casual</b>: son cortas y no mueven tu ELO.</li>
+            </ul>`,
+        setup: { B: 'C3 G7 E5', W: 'G3 C7' },
+        steps: [],
+        done: 'Ya conoces las reglas. ¡Ahora toca jugar!'
+    }
+];
+
+const LEARN_ERRORS = {
+    OCCUPIED: { title: 'Punto ocupado', msg: 'Ahí ya hay una piedra.' },
+    SUICIDE: { title: 'Suicidio', msg: 'Tu piedra se quedaría sin libertades.' },
+    KO: { title: 'Ko', msg: 'No puedes recapturar en seguida: repetiría la posición.' }
+};
+
+const learnCanvas = $('learnBoard');
+const lctx = learnCanvas.getContext('2d');
+const ls = { idx: 0, board: {}, prev: null, step: 0, turn: 'B', placed: 0, done: false, last: null, flash: null, hover: null, busy: false };
+let learnPx = 640;
+let learnDpr = 1;
+let flashTimer = null;
+
+function learnDoneSet() {
+    try { return new Set(JSON.parse(store.get('gousc_learn') || '[]')); } catch (e) { return new Set(); }
+}
+
+function markLessonDone(i) {
+    const set = learnDoneSet();
+    set.add(i);
+    store.set('gousc_learn', JSON.stringify([...set]));
+}
+
+function setupBoard(setup) {
+    const board = {};
+    for (const color of ['B', 'W']) {
+        String((setup && setup[color]) || '').split(/\s+/).filter(Boolean).forEach(label => {
+            const c = Board.parseCoord(label);
+            if (c) board[c.x + ',' + c.y] = color;
+        });
+    }
+    return board;
+}
+
+function learnColor() {
+    const L = LESSONS[ls.idx];
+    if (L.free) return ls.turn;
+    const step = L.steps[ls.step];
+    return step ? step.color : null;
+}
+
+function openLesson(i) {
+    clearTimeout(flashTimer);
+    const L = LESSONS[i];
+    Object.assign(ls, { idx: i, board: setupBoard(L.setup), prev: null, step: 0, turn: 'B', placed: 0, done: false, last: null, flash: null, hover: null, busy: false });
+    $('lessonFeedback').hidden = true;
+    if (!L.free && !L.steps.length) completeLesson(false);
+    renderLesson();
+}
+
+function renderLesson() {
+    const L = LESSONS[ls.idx];
+    const doneSet = learnDoneSet();
+    $('lessonKicker').textContent = `Lección ${ls.idx + 1} de ${LESSONS.length}`;
+    $('lessonTitle').textContent = L.title;
+    $('lessonText').innerHTML = L.text;
+
+    const color = learnColor();
+    const step = L.steps && L.steps[ls.step];
+    const task = L.free ? `${L.task} <span class="muted">(${ls.placed}/${L.free})</span>` : step ? step.task : '';
+    $('lessonTask').hidden = ls.done || !task;
+    $('lessonTask').innerHTML = task
+        ? `<span class="stone stone--${color === 'W' ? 'w' : 'b'}"></span><span><b>${color === 'W' ? 'Blancas' : 'Negras'}</b> · ${task}</span>`
+        : '';
+
+    $('lessonPrev').disabled = ls.idx === 0;
+    const last = ls.idx === LESSONS.length - 1;
+    $('lessonNext').innerHTML = last ? `${icon('play')}<span>Ir a jugar</span>` : '<span>Siguiente</span>';
+    $('lessonNext').classList.toggle('btnPrimary', ls.done);
+    $('lessonNext').classList.toggle('btnGhost', !ls.done);
+
+    $('lessonList').innerHTML = LESSONS.map((l, i) => `
+        <li><button class="lessonItem ${i === ls.idx ? 'active' : ''} ${doneSet.has(i) ? 'done' : ''}" data-lesson="${i}" type="button">
+            <span class="lessonNum">${doneSet.has(i) ? icon('check') : i + 1}</span>
+            <span class="lessonName">${esc(l.title)}</span>
+        </button></li>`).join('');
+    $('learnProgress').textContent = `${doneSet.size} de ${LESSONS.length} completadas`;
+    drawLearn();
+}
+
+function learnFeedback(type, html) {
+    const el = $('lessonFeedback');
+    el.className = 'lessonFeedback lessonFeedback--' + type;
+    el.innerHTML = `${icon(type === 'good' ? 'check' : type === 'bad' ? 'x' : 'info')}<span>${html}</span>`;
+    el.hidden = false;
+}
+
+function completeLesson(withSound = true) {
+    const L = LESSONS[ls.idx];
+    ls.done = true;
+    markLessonDone(ls.idx);
+    const text = typeof L.done === 'function' ? L.done(ls) : L.done;
+    learnFeedback('good', L.steps && !L.steps.length ? text : `<b>¡Bien hecho!</b> ${text}`);
+    if (withSound) Sound.chime(true);
+}
+
+/** Muestra una X roja un momento sobre una jugada rechazada. */
+function flashPoint(p) {
+    ls.flash = p;
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { ls.flash = null; drawLearn(); }, 900);
+}
+
+function applyLearnMove(color, p, res) {
+    ls.prev = ls.board;
+    ls.board = res.board;
+    ls.last = p;
+    if (res.captured) Sound.capture(res.captured); else Sound.stone();
+}
+
+function learnClick(p) {
+    const L = LESSONS[ls.idx];
+    if (ls.done || ls.busy) return;
+    const color = learnColor();
+    const label = Board.formatCoord(p.x, p.y);
+    const res = LocalGo.play(ls.board, 9, color, p.x, p.y, ls.prev);
+
+    if (L.free) {
+        if (res.error) { flashPoint(p); learnFeedback('bad', LEARN_ERRORS[res.error].msg); renderLesson(); return; }
+        applyLearnMove(color, p, res);
+        ls.turn = color === 'B' ? 'W' : 'B';
+        ls.placed++;
+        $('lessonFeedback').hidden = true;
+        if (ls.placed >= L.free) completeLesson();
+        renderLesson();
+        return;
+    }
+
+    const step = L.steps[ls.step];
+    const wanted = step.accept === 'any' || step.accept.includes(label);
+
+    if (step.expect) {
+        // en este paso lo que se busca es comprobar que la jugada está prohibida
+        flashPoint(p);
+        if (wanted && res.error === step.expect) {
+            Sound.stone(0, 0.4);
+            advanceLesson(step, `<b>${LEARN_ERRORS[res.error].title}.</b> ${step.ok || LEARN_ERRORS[res.error].msg}`);
+        } else if (res.error) {
+            learnFeedback('bad', LEARN_ERRORS[res.error].msg);
+        } else {
+            learnFeedback('bad', step.hint);
+        }
+        renderLesson();
+        return;
+    }
+
+    if (res.error) { flashPoint(p); learnFeedback('bad', `<b>${LEARN_ERRORS[res.error].title}.</b> ${LEARN_ERRORS[res.error].msg}`); renderLesson(); return; }
+    if (!wanted) {
+        flashPoint(p);
+        learnFeedback('bad', (step.wrong && step.wrong[label]) || step.hint);
+        renderLesson();
+        return;
+    }
+
+    applyLearnMove(color, p, res);
+    if (step.reply) {
+        // el otro color responde en el primer punto libre de la lista
+        ls.busy = true;
+        renderLesson();
+        setTimeout(() => {
+            const other = color === 'B' ? 'W' : 'B';
+            for (const r of step.reply) {
+                const c = Board.parseCoord(r);
+                const rr = LocalGo.play(ls.board, 9, other, c.x, c.y, ls.prev);
+                if (!rr.error) { applyLearnMove(other, c, rr); break; }
+            }
+            ls.busy = false;
+            advanceLesson(step, step.ok);
+            renderLesson();
+        }, 500);
+        return;
+    }
+    advanceLesson(step, step.ok);
+    renderLesson();
+}
+
+function advanceLesson(step, okMsg) {
+    ls.step++;
+    if (ls.step >= LESSONS[ls.idx].steps.length) completeLesson();
+    else if (okMsg) learnFeedback('good', okMsg);
+    else $('lessonFeedback').hidden = true;
+}
+
+function learnMarks() {
+    const L = LESSONS[ls.idx];
+    const marks = [];
+    if (L.showLibs) {
+        const libs = new Set();
+        for (const [k, c] of Object.entries(ls.board)) {
+            if (c !== L.showLibs) continue;
+            const [x, y] = k.split(',').map(Number);
+            LocalGo.group(ls.board, x, y, 9).libs.forEach(l => libs.add(l));
+        }
+        libs.forEach(l => { const [x, y] = l.split(',').map(Number); marks.push({ x, y, type: 'lib' }); });
+    }
+    if (L.showTerritory) {
+        const t = LocalGo.territory(ls.board, 9);
+        t.B.forEach(([x, y]) => marks.push({ x, y, type: 'terrB' }));
+        t.W.forEach(([x, y]) => marks.push({ x, y, type: 'terrW' }));
+    }
+    const step = !ls.done && L.steps && L.steps[ls.step];
+    if (step && step.target) {
+        const c = Board.parseCoord(step.target);
+        if (c && !ls.board[c.x + ',' + c.y]) marks.push({ x: c.x, y: c.y, type: 'target' });
+    }
+    if (ls.flash) marks.push({ x: ls.flash.x, y: ls.flash.y, type: 'x' });
+    return marks;
+}
+
+function fitLearn() {
+    const w = Math.floor($('learnFrame').clientWidth);
+    if (!w) return;
+    learnDpr = Math.min(window.devicePixelRatio || 1, 2);
+    learnPx = w;
+    learnCanvas.width = Math.round(w * learnDpr);
+    learnCanvas.height = Math.round(w * learnDpr);
+    drawLearn();
+}
+
+function drawLearn() {
+    const color = learnColor();
+    Board.draw(lctx, {
+        px: learnPx,
+        dpr: learnDpr,
+        size: 9,
+        board: ls.board,
+        last: ls.last,
+        ghost: !ls.done && !ls.busy && color ? ls.hover : null,
+        ghostColor: color || 'B',
+        marks: learnMarks()
+    });
+}
+
+learnCanvas.addEventListener('click', (e) => {
+    const p = Board.pick(learnCanvas, learnPx, 9, e.clientX, e.clientY);
+    if (p) learnClick(p);
+});
+learnCanvas.addEventListener('mousemove', (e) => {
+    const p = Board.pick(learnCanvas, learnPx, 9, e.clientX, e.clientY);
+    const key = p ? p.x + ',' + p.y : '';
+    const prevKey = ls.hover ? ls.hover.x + ',' + ls.hover.y : '';
+    if (key !== prevKey) { ls.hover = p; drawLearn(); }
+});
+learnCanvas.addEventListener('mouseleave', () => { if (ls.hover) { ls.hover = null; drawLearn(); } });
+
+$('lessonList').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-lesson]');
+    if (b) openLesson(Number(b.dataset.lesson));
+});
+$('lessonPrev').addEventListener('click', () => { if (ls.idx > 0) openLesson(ls.idx - 1); });
+$('lessonReset').addEventListener('click', () => openLesson(ls.idx));
+$('lessonNext').addEventListener('click', () => {
+    if (ls.idx < LESSONS.length - 1) openLesson(ls.idx + 1);
+    else switchView('lobbyView');
+});
+
+function openLearnView() {
+    const doneSet = learnDoneSet();
+    if (!ls.started) {
+        // al entrar por primera vez, abre la primera lección sin completar
+        ls.started = true;
+        const first = LESSONS.findIndex((l, i) => !doneSet.has(i));
+        openLesson(first >= 0 ? first : 0);
+    } else {
+        renderLesson();
+    }
+    requestAnimationFrame(fitLearn);
+}
+
+if (window.ResizeObserver) {
+    new ResizeObserver(() => { if (state.view === 'learnView') fitLearn(); }).observe($('learnFrame'));
+} else {
+    window.addEventListener('resize', () => { if (state.view === 'learnView') fitLearn(); });
 }
 
 /* ================================================== refresco automático === */
