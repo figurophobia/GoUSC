@@ -291,6 +291,18 @@ input:focus {
     transform: rotate(-4deg);
     box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .18), 0 2px 6px rgba(200, 70, 59, .35);
     transition: transform .25s var(--ease);
+    position: relative;
+    padding: 0 5px 8px 0;   /* sube el kanji para dejar sitio a la firma */
+}
+.seal::after {
+    /* firma "USC" en tinta negra, como el sello de un artista */
+    content: "USC";
+    position: absolute;
+    right: 3px;
+    bottom: 2px;
+    font: 800 6.5px/1 var(--font);
+    letter-spacing: .04em;
+    color: #111;
 }
 .wordmark {
     font: 800 21px/1 var(--font-display);
@@ -298,7 +310,8 @@ input:focus {
 }
 .wordmark b { color: var(--accent); font-weight: 800; }
 
-.brandLg .seal { width: 46px; height: 46px; font-size: 27px; border-radius: 10px; }
+.brandLg .seal { width: 46px; height: 46px; font-size: 27px; border-radius: 10px; padding: 0 6px 9px 0; }
+.brandLg .seal::after { right: 4px; bottom: 3px; font-size: 8.5px; }
 .brandLg .wordmark { font-size: 30px; }
 
 .chip {

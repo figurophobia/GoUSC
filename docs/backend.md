@@ -166,6 +166,9 @@ Además, `IllegalArgumentException` (p. ej. mandarte una solicitud a ti mismo) �
 |---------|-----------|
 | `GoUscApplicationTests.java` | `@SpringBootTest contextLoads`: arranca la app completa contra PostgreSQL real (crea esquema y siembra usuarios). |
 | `service/GoRulesTest.java` | 9 tests unitarios **sin BD**: colocar piedra, celda ocupada, fuera de rango, captura de grupo, suicidio rechazado, ko rechazado, cálculo de territorio, grupo/libertades, ida y vuelta de coordenadas. |
+| `service/EloServiceTest.java` | 5 tests unitarios **sin BD** del ELO: ±16 entre iguales, el favorito gana poco (+3), el débil gana mucho (+29), mínimo 1 punto y suma cero. |
+| `service/LeaderboardTest.java` | 8 tests **contra PostgreSQL** (Fase 5): partidas Ranked completas que mueven ELO y victorias/derrotas, victoria de blancas por komi, las Casual no cuentan, abandono da la victoria al rival, cancelar una sala vacía no cuenta, resultados acumulados con suma cero y ranking ordenado. Cada test va en una transacción que se deshace: no deja datos. |
+| `controller/ApiTest.java` | 15 tests de endpoints con **MockMvc**: registro (201 + `Location`), duplicado (409), validación (400), login correcto y fallido (mismo 401), ranking ordenado, crear partida, cabecera ausente (400), partida llena (409), partida inexistente (404), jugada fuera de turno / casilla ocupada / sin coordenadas (400), jugada válida y mensaje a uno mismo (400). Comprueba también que `password` nunca sale en las respuestas. |
 
 ---
 
@@ -542,15 +545,12 @@ sequenceDiagram
 
 ## 7. Qué queda por hacer
 
-Las fases 1–4 (backend, validaciones y frontend en `static/`) están hechas; ver el
+Las fases 1–5 (backend, validaciones, frontend en `static/` y tests del leaderboard) están hechas; ver el
 estado en el [README](../README.md#estado-del-proyecto).
 
-1. **Fase 5 — Testear el leaderboard**: tests automáticos del ranking y del ELO:
-   simular varias partidas rankeadas y comprobar que la clasificación se ordena bien,
-   que los cambios de ELO son los esperados y que victorias/derrotas se acumulan.
-2. **Fase 6 — Despliegue**: publicar el backend con Docker para que el frontend se
+1. **Fase 6 — Despliegue**: publicar el backend con Docker para que el frontend se
    conecte desde cualquier máquina (y no solo desde este ordenador).
-3. **Opcionales**: autenticación real (JWT), partidas y chat en tiempo real (SSE),
+2. **Opcionales**: autenticación real (JWT), partidas y chat en tiempo real (SSE),
    espectadores.
 
 **Limitación conocida:** como el usuario se identifica solo con la cabecera `X-User-Id`,

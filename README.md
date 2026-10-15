@@ -14,11 +14,12 @@ controller → service → repository → entity, DTOs como *records* y errores 
 | 2 | Controllers REST + manejo global de errores + prueba end-to-end | ✅ Hecha |
 | 3 | Probar y pulir el backend: tests automáticos de los endpoints y validación de los datos de entrada | ✅ Hecha |
 | 4 | Frontend con HTML + JavaScript vanilla | ✅ Hecha |
-| 5 | Testear el leaderboard: tests automáticos del ranking y de los cambios de ELO | ⬜ Pendiente |
+| 5 | Testear el leaderboard: tests automáticos del ranking y de los cambios de ELO | ✅ Hecha |
 | 6 | Despliegue: publicar el backend (Docker) para que el frontend se conecte desde cualquier máquina | ⬜ Pendiente |
 
-**Comprobaciones actuales:** `./mvnw test` → 10/10 tests OK (9 de reglas del Go +
-carga de contexto con BD real). Prueba manual E2E de todos los endpoints
+**Comprobaciones actuales:** `./mvnw test` → 38/38 tests OK: 9 de reglas del Go, 5 de
+cálculo de ELO, 8 del leaderboard contra la BD real, 15 de endpoints (MockMvc) y la carga
+de contexto. Prueba manual E2E de todos los endpoints
 verificada y test end-to-end de navegador (Chrome CDP) con 41 comprobaciones OK:
 navegación entre vistas, edición de perfil, actualización automática de lobby/ranking/
 amigos/chats, snap del tablero, avisos, login, responsive móvil y 0 errores de consola.
@@ -107,18 +108,15 @@ Errores en formato `application/problem+json` (`type`, `title`, `detail`, `statu
 
 ## Qué queda por hacer
 
-1. **Fase 5 — Testear el leaderboard**: tests automáticos del ranking y del ELO:
-   simular varias partidas rankeadas y comprobar que la clasificación se ordena bien,
-   que los cambios de ELO son los esperados y que victorias/derrotas se acumulan.
-2. **Fase 6 — Despliegue**: publicar el backend con Docker para que el frontend se
+1. **Fase 6 — Despliegue**: publicar el backend con Docker para que el frontend se
    conecte desde cualquier máquina (y no solo desde este ordenador).
-3. **Opcionales**: autenticación real con JWT en lugar de la cabecera `X-User-Id`,
+2. **Opcionales**: autenticación real con JWT en lugar de la cabecera `X-User-Id`,
    partidas y chat en tiempo real (WebSockets/SSE), espectadores.
 
 ## Funcionalidades del frontend
 
 Diseño propio inspirado en la sobriedad de Lichess, con identidad de Go: sello *hanko*
-rojo con el kanji 碁, tablero de madera de kaya, piedras de pizarra y concha y tipografía
+rojo con el kanji 碁 y la firma «USC» en negro, tablero de madera de kaya, piedras de pizarra y concha y tipografía
 Shippori Mincho. Todos los recursos (veta de la madera, piedras, sonidos, iconos) se
 generan en el propio cliente: no se usan imágenes ni sonidos de terceros.
 
@@ -142,7 +140,25 @@ generan en el propio cliente: no se usan imágenes ni sonidos de terceros.
 
 ## Historial de cambios
 
-### Iteración actual — Rediseño de UI, perfil y auto-actualización
+### Iteración actual — Fase 5, Lombok y nuevo diseño
+
+**Fase 5 — Tests del leaderboard (38/38 tests OK):**
+- `EloServiceTest`: cálculo del ELO sin BD (±16 entre iguales, +3 el favorito, +29 el
+  débil, mínimo 1 punto, suma cero).
+- `LeaderboardTest`: partidas Ranked completas contra PostgreSQL; comprueba ELO,
+  victorias/derrotas, que las Casual no cuentan, el abandono y el orden del ranking.
+  Cada test se deshace al acabar, así que no deja datos.
+- `ApiTest`: endpoints con MockMvc (201, 400, 401, 404, 409) y que la contraseña nunca
+  aparece en las respuestas.
+
+**Backend:** Lombok en todas las capas (`@RequiredArgsConstructor` en servicios y
+controladores, `@Getter` en excepciones, `@NoArgsConstructor` en entidades).
+
+**Frontend:** rediseño completo inspirado en Lichess con identidad de Go (ver
+[Funcionalidades del frontend](#funcionalidades-del-frontend)); el logo es un sello rojo
+con el kanji 碁 y la firma «USC» en negro en la esquina inferior derecha.
+
+### Iteración anterior — Rediseño de UI, perfil y auto-actualización
 
 **Frontend (reescrito por completo):**
 - `index.html`: vista única con tarjeta de acceso, cabecera fija con marca, navegación
@@ -167,7 +183,7 @@ generan en el propio cliente: no se usan imágenes ni sonidos de terceros.
 **Verificación:** `./mvnw test` → 10/10 OK; test E2E de navegador (Chrome headless + CDP)
 → 41/41 comprobaciones y 0 errores de consola; sin scroll horizontal en móvil.
 
-### Iteración anterior — Fase 3 y 4
+### Fases 3 y 4
 
 #### Fase 3 — Pulido del backend
 - **Validación de datos de entrada (Bean Validation)**:
